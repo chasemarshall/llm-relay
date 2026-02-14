@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 @main
 struct LLMChatApp: App {
@@ -6,5 +7,6 @@ struct LLMChatApp: App {
         WindowGroup {
             ContentView()
         }
+        .modelContainer(for: [Conversation.self, Message.self])
     }
 }
