@@ -40,11 +40,27 @@ final class OpenAIService: LLMService, @unchecked Sendable {
                         throw LLMError.networkError("Invalid response")
                     }
 
-                    switch httpResponse.statusCode {
-                    case 200: break
-                    case 401: throw LLMError.invalidAPIKey
-                    case 429: throw LLMError.rateLimited
-                    default: throw LLMError.networkError("HTTP \(httpResponse.statusCode)")
+                    if httpResponse.statusCode != 200 {
+                        // Read the error body for better error messages
+                        var errorBody = ""
+                        for try await line in bytes.lines {
+                            errorBody += line
+                            if errorBody.count > 500 { break }
+                        }
+
+                        switch httpResponse.statusCode {
+                        case 401: throw LLMError.invalidAPIKey
+                        case 429: throw LLMError.rateLimited
+                        default:
+                            // Try to parse error message from JSON
+                            if let data = errorBody.data(using: .utf8),
+                               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                               let error = json["error"] as? [String: Any],
+                               let message = error["message"] as? String {
+                                throw LLMError.networkError(message)
+                            }
+                            throw LLMError.networkError("HTTP \(httpResponse.statusCode)")
+                        }
                     }
 
                     for try await line in bytes.lines {

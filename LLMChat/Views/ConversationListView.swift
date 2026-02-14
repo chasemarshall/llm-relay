@@ -4,8 +4,10 @@ import SwiftData
 struct ConversationListView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Conversation.updatedAt, order: .reverse) private var conversations: [Conversation]
+    @Query(sort: \Agent.createdAt) private var agents: [Agent]
     @State private var viewModel = ConversationListViewModel()
-    @State private var selectedConversation: Conversation?
+    @State private var navigationPath: [Conversation] = []
+    @State private var modelManager = ModelManager.shared
 
     var filteredConversations: [Conversation] {
         if viewModel.searchText.isEmpty { return conversations }
@@ -15,42 +17,68 @@ struct ConversationListView: View {
     }
 
     var body: some View {
-        NavigationSplitView {
-            List(filteredConversations, selection: $selectedConversation) { conversation in
-                NavigationLink(value: conversation) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(conversation.title)
-                            .font(.headline)
-                            .lineLimit(1)
-                        HStack {
-                            Text(conversation.provider.displayName)
+        NavigationStack(path: $navigationPath) {
+            List {
+                ForEach(filteredConversations) { conversation in
+                    Button {
+                        navigationPath = [conversation]
+                    } label: {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(conversation.title)
+                                .font(.headline)
+                                .lineLimit(1)
+                            Text(modelManager.modelName(for: conversation.modelId))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
-                            Text("\u{00B7}")
-                                .foregroundStyle(.tertiary)
-                            Text(conversation.modelId)
-                                .font(.caption)
-                                .foregroundStyle(.tertiary)
                         }
+                        .padding(.vertical, 2)
                     }
-                    .padding(.vertical, 2)
-                }
-                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                    Button(role: .destructive) {
-                        viewModel.deleteConversation(conversation, modelContext: modelContext)
-                    } label: {
-                        Label("Delete", systemImage: "trash")
+                    .foregroundStyle(.primary)
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        Button(role: .destructive) {
+                            if navigationPath.first?.id == conversation.id {
+                                navigationPath = []
+                            }
+                            viewModel.deleteConversation(conversation, modelContext: modelContext)
+                        } label: {
+                            Image(systemName: "trash")
+                        }
                     }
                 }
             }
             .searchable(text: $viewModel.searchText, prompt: "Search chats")
             .navigationTitle("Chats")
+            .navigationDestination(for: Conversation.self) { conversation in
+                ChatView(conversation: conversation, onNewChat: { newChat() })
+            }
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        viewModel.showNewChat = true
-                    } label: {
-                        Image(systemName: "square.and.pencil")
+                    if agents.isEmpty {
+                        Button {
+                            newChat()
+                        } label: {
+                            Image(systemName: "square.and.pencil")
+                        }
+                    } else {
+                        Menu {
+                            Button {
+                                newChat()
+                            } label: {
+                                Label("New Chat", systemImage: "bubble.left")
+                            }
+
+                            Divider()
+
+                            ForEach(agents) { agent in
+                                Button {
+                                    newChat(agent: agent)
+                                } label: {
+                                    Label(agent.name, systemImage: "person.circle")
+                                }
+                            }
+                        } label: {
+                            Image(systemName: "square.and.pencil")
+                        }
                     }
                 }
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -61,30 +89,22 @@ struct ConversationListView: View {
                     }
                 }
             }
-            .sheet(isPresented: $viewModel.showNewChat) {
-                NewChatSheet { provider, modelId, systemPrompt in
-                    let convo = viewModel.createConversation(
-                        provider: provider,
-                        modelId: modelId,
-                        systemPrompt: systemPrompt,
-                        modelContext: modelContext
-                    )
-                    selectedConversation = convo
-                }
-            }
             .sheet(isPresented: $viewModel.showSettings) {
                 SettingsView()
             }
-        } detail: {
-            if let conversation = selectedConversation {
-                ChatView(conversation: conversation)
-            } else {
-                ContentUnavailableView(
-                    "No Chat Selected",
-                    systemImage: "bubble.left.and.bubble.right",
-                    description: Text("Select a conversation or create a new one")
-                )
-            }
         }
+    }
+
+    private func newChat(agent: Agent? = nil) {
+        let convo = viewModel.createConversation(
+            modelId: agent?.modelId ?? SettingsManager.defaultModelId,
+            systemPrompt: agent?.systemPrompt,
+            modelContext: modelContext
+        )
+        if let agent {
+            convo.title = agent.name
+        }
+        // Replace the navigation stack so we navigate to the new chat
+        navigationPath = [convo]
     }
 }

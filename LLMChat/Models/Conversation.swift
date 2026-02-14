@@ -15,16 +15,16 @@ final class Conversation {
     var messages: [Message]
 
     var provider: Provider {
-        get { Provider(rawValue: providerRaw) ?? .openai }
+        get { Provider(rawValue: providerRaw) ?? .openRouter }
         set { providerRaw = newValue.rawValue }
     }
 
-    init(title: String = "New Chat", systemPrompt: String? = nil, provider: Provider = .openai, modelId: String = "gpt-4o") {
+    init(title: String = "New Chat", systemPrompt: String? = nil, provider: Provider = .openRouter, modelId: String? = nil) {
         self.id = UUID()
         self.title = title
         self.systemPrompt = systemPrompt
         self.providerRaw = provider.rawValue
-        self.modelId = modelId
+        self.modelId = modelId ?? SettingsManager.defaultModelId
         self.createdAt = Date()
         self.updatedAt = Date()
         self.messages = []

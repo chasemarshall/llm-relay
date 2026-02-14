@@ -4,19 +4,14 @@ import SwiftData
 @MainActor @Observable
 final class ConversationListViewModel {
     var searchText: String = ""
-    var showNewChat: Bool = false
     var showSettings: Bool = false
 
     func createConversation(
-        provider: Provider,
         modelId: String,
         systemPrompt: String?,
         modelContext: ModelContext
     ) -> Conversation {
-        let convo = Conversation(
-            provider: provider,
-            modelId: modelId
-        )
+        let convo = Conversation(modelId: modelId)
         if let prompt = systemPrompt, !prompt.isEmpty {
             convo.systemPrompt = prompt
         }

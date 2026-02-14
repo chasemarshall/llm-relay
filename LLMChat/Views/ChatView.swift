@@ -3,8 +3,11 @@ import SwiftData
 
 struct ChatView: View {
     @Environment(\.modelContext) private var modelContext
+    @State private var modelManager = ModelManager.shared
     let conversation: Conversation
+    var onNewChat: (() -> Void)?
     @State private var viewModel: ChatViewModel?
+    @FocusState private var isInputFocused: Bool
 
     var body: some View {
         Group {
@@ -18,17 +21,47 @@ struct ChatView: View {
             if viewModel == nil {
                 viewModel = ChatViewModel(conversation: conversation, modelContext: modelContext)
             }
+            // Auto-focus keyboard when entering any chat
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                isInputFocused = true
+            }
         }
-        .navigationTitle(conversation.title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .principal) {
-                VStack(spacing: 0) {
-                    Text(conversation.title)
-                        .font(.headline)
-                    Text(conversation.modelId)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                Menu {
+                    ForEach(modelManager.groupedModels) { group in
+                        Section(group.displayName) {
+                            ForEach(group.models) { model in
+                                Button {
+                                    conversation.modelId = model.id
+                                    try? modelContext.save()
+                                } label: {
+                                    if model.id == conversation.modelId {
+                                        Label(model.name, systemImage: "checkmark")
+                                    } else {
+                                        Text(model.name)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Text(modelManager.modelName(for: conversation.modelId))
+                            .font(.subheadline.weight(.medium))
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.system(size: 10, weight: .semibold))
+                    }
+                    .foregroundStyle(.primary)
+                }
+                .buttonStyle(.glass)
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    onNewChat?()
+                } label: {
+                    Image(systemName: "plus")
                 }
             }
         }
@@ -36,83 +69,90 @@ struct ChatView: View {
 
     @ViewBuilder
     private func chatContent(viewModel: ChatViewModel) -> some View {
-        VStack(spacing: 0) {
-            ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVStack(spacing: 12) {
-                        if viewModel.sortedMessages.isEmpty {
-                            emptyState
-                        }
-                        ForEach(viewModel.sortedMessages) { message in
-                            MessageBubbleView(
-                                message: message,
-                                isStreaming: viewModel.isStreaming && message.id == viewModel.sortedMessages.last?.id
-                            )
-                            .id(message.id)
-                        }
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(spacing: 12) {
+                    ForEach(viewModel.sortedMessages) { message in
+                        MessageBubbleView(
+                            message: message,
+                            isStreaming: viewModel.isStreaming && message.id == viewModel.sortedMessages.last?.id
+                        )
+                        .id(message.id)
                     }
-                    .padding(.vertical)
                 }
-                .onChange(of: viewModel.sortedMessages.count) {
-                    if let last = viewModel.sortedMessages.last {
-                        withAnimation(.easeOut(duration: 0.3)) {
-                            proxy.scrollTo(last.id, anchor: .bottom)
-                        }
+                .padding(.vertical)
+            }
+            .onChange(of: viewModel.sortedMessages.count) {
+                if let last = viewModel.sortedMessages.last {
+                    withAnimation(.easeOut(duration: 0.3)) {
+                        proxy.scrollTo(last.id, anchor: .bottom)
                     }
                 }
             }
-
-            inputBar(viewModel: viewModel)
+            .safeAreaInset(edge: .bottom) {
+                inputBar(viewModel: viewModel)
+            }
         }
     }
 
-    private var emptyState: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "bubble.left.and.bubble.right")
-                .font(.system(size: 48))
-                .foregroundStyle(.tertiary)
-            Text("Start a conversation")
-                .font(.title3)
-                .foregroundStyle(.secondary)
-            Text(conversation.modelId)
-                .font(.caption)
-                .foregroundStyle(.tertiary)
-        }
-        .padding(.top, 100)
+    private var hasText: Bool {
+        !(viewModel?.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
     }
 
     private func inputBar(viewModel: ChatViewModel) -> some View {
-        HStack(spacing: 12) {
-            TextField("Message...", text: Binding(
+        HStack(spacing: 8) {
+            TextField("Ask anything", text: Binding(
                 get: { viewModel.inputText },
                 set: { viewModel.inputText = $0 }
             ), axis: .vertical)
                 .lineLimit(1...6)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .focused($isInputFocused)
 
             if viewModel.isStreaming {
                 Button {
                     viewModel.stopStreaming()
                 } label: {
-                    Image(systemName: "stop.circle.fill")
-                        .font(.title2)
-                        .foregroundStyle(.red)
+                    ZStack {
+                        Circle()
+                            .fill(.red)
+                            .frame(width: 30, height: 30)
+                        Image(systemName: "stop.fill")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
                 }
             } else {
                 Button {
                     viewModel.sendMessage()
                 } label: {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .font(.title2)
-                        .foregroundColor(viewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? .secondary : .accentColor)
+                    ZStack {
+                        Circle()
+                            .fill(hasText ? Color.accentColor : Color(.systemGray4))
+                            .frame(width: 30, height: 30)
+                        Image(systemName: "arrow.up")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
                 }
-                .disabled(viewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .disabled(!hasText)
             }
         }
-        .padding(.horizontal)
-        .padding(.vertical, 8)
-        .background(.bar)
+        .padding(.leading, 16)
+        .padding(.trailing, 6)
+        .padding(.vertical, 6)
+        .background(.ultraThinMaterial, in: Capsule())
+        .padding(.horizontal, 12)
+        .padding(.bottom, 8)
+        .padding(.top, 12)
+        .background(Color(.systemBackground))
+        .background(alignment: .top) {
+            LinearGradient(
+                colors: [.clear, Color(.systemBackground)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 40)
+            .offset(y: -40)
+        }
     }
 }
