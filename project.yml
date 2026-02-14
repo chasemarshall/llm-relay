@@ -1,0 +1,24 @@
+name: LLMChat
+options:
+  bundleIdPrefix: com.llmchat
+  deploymentTarget:
+    iOS: "18.0"
+  xcodeVersion: "16.0"
+settings:
+  SWIFT_VERSION: "6.0"
+targets:
+  LLMChat:
+    type: application
+    platform: iOS
+    sources:
+      - path: LLMChat
+        excludes:
+          - "**/.gitkeep"
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: com.llmchat.app
+      PRODUCT_NAME: LLMChat
+      INFOPLIST_GENERATION_MODE: GeneratedFile
+      MARKETING_VERSION: "1.0.0"
+      CURRENT_PROJECT_VERSION: "1"
+      GENERATE_INFOPLIST_FILE: true
+      SWIFT_STRICT_CONCURRENCY: complete
