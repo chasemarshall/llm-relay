@@ -7,7 +7,14 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		00C1BEB544FAE63D80F55693 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E4F05C12D81505289903835 /* SettingsView.swift */; };
+		10BA2910692E728236E42928 /* ChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A50FBB83C4107EA97BFA8B3E /* ChatView.swift */; };
+		171944231FC31FEBC22BAFEE /* MessageBubbleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A3D1F4B9A8102748684AA12 /* MessageBubbleView.swift */; };
 		17D7D3401D46DC8E6F2DA949 /* LLMService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 441CEDE02CB359FB98D3E2BC /* LLMService.swift */; };
+		27EF3C43C1905184864F5EFB /* StreamingIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9FDEE1F117F6959F4D6336D /* StreamingIndicator.swift */; };
+		2B2E54BA43D52CD30FF31EFF /* ConversationListViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F4A10E4B33273BCD764FAF6 /* ConversationListViewModel.swift */; };
+		3298CCC491A9075A8A612535 /* ConversationListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C4EE3C92AB9DC504EED8376 /* ConversationListView.swift */; };
+		3937DCB8796130F75B05D350 /* ChatViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D84DC0B261A52D761648EA6A /* ChatViewModel.swift */; };
 		4CF8EC4497B26912CEFD77A1 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2393D8D0164DB0E9F0EFDCF5 /* ContentView.swift */; };
 		63ECE76AC15D442EE2B4FA7B /* AnthropicService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F4AF23F64B36DEC013C8652 /* AnthropicService.swift */; };
 		6485A69D6D23F2F6600C31B6 /* OpenAIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02FE12D5D4663CE8DE775C8F /* OpenAIService.swift */; };
@@ -15,6 +22,7 @@
 		846386497DC65E192FE2673C /* Provider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CB858150C26D894162DC783 /* Provider.swift */; };
 		89385AE26BC264F5DA601527 /* HapticManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E36EE22764F40C23A120149 /* HapticManager.swift */; };
 		9C1E4157BC3BB6B0D2FFB03B /* LLMChatApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F05E61A736904E9A6692F57 /* LLMChatApp.swift */; };
+		C1C577C962F09C913B0900E0 /* NewChatSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25CD5BFF3E832A594A0B02C5 /* NewChatSheet.swift */; };
 		D4C46157D7A4EC136867A55C /* ServiceFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F5390094579683A76443E17 /* ServiceFactory.swift */; };
 		DDE729D28ED6380E1D565A85 /* KeychainManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3008B770689AF3F541466E4A /* KeychainManager.swift */; };
 		E019BF779A6F21B58BC3113D /* Message.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E5A4F0E74F09ECE654BE4DF /* Message.swift */; };
@@ -23,17 +31,25 @@
 
 /* Begin PBXFileReference section */
 		02FE12D5D4663CE8DE775C8F /* OpenAIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAIService.swift; sourceTree = "<group>"; };
+		1F4A10E4B33273BCD764FAF6 /* ConversationListViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationListViewModel.swift; sourceTree = "<group>"; };
 		2393D8D0164DB0E9F0EFDCF5 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		25CD5BFF3E832A594A0B02C5 /* NewChatSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewChatSheet.swift; sourceTree = "<group>"; };
 		3008B770689AF3F541466E4A /* KeychainManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainManager.swift; sourceTree = "<group>"; };
 		3E36EE22764F40C23A120149 /* HapticManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HapticManager.swift; sourceTree = "<group>"; };
 		441CEDE02CB359FB98D3E2BC /* LLMService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMService.swift; sourceTree = "<group>"; };
+		4C4EE3C92AB9DC504EED8376 /* ConversationListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationListView.swift; sourceTree = "<group>"; };
 		4F5390094579683A76443E17 /* ServiceFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceFactory.swift; sourceTree = "<group>"; };
 		5D6D86616C4EA99E8DEC8726 /* MarkdownRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownRenderer.swift; sourceTree = "<group>"; };
 		60A62158BE57B07C41E64872 /* Conversation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Conversation.swift; sourceTree = "<group>"; };
+		6E4F05C12D81505289903835 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		6F05E61A736904E9A6692F57 /* LLMChatApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMChatApp.swift; sourceTree = "<group>"; };
+		7A3D1F4B9A8102748684AA12 /* MessageBubbleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageBubbleView.swift; sourceTree = "<group>"; };
 		7CB858150C26D894162DC783 /* Provider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Provider.swift; sourceTree = "<group>"; };
 		7E5A4F0E74F09ECE654BE4DF /* Message.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Message.swift; sourceTree = "<group>"; };
 		8F4AF23F64B36DEC013C8652 /* AnthropicService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnthropicService.swift; sourceTree = "<group>"; };
+		A50FBB83C4107EA97BFA8B3E /* ChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatView.swift; sourceTree = "<group>"; };
+		D84DC0B261A52D761648EA6A /* ChatViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatViewModel.swift; sourceTree = "<group>"; };
+		D9FDEE1F117F6959F4D6336D /* StreamingIndicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamingIndicator.swift; sourceTree = "<group>"; };
 		F8E0043137DECF5E4A200664 /* LLMChat.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = LLMChat.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -59,6 +75,15 @@
 			path = Utilities;
 			sourceTree = "<group>";
 		};
+		6559E3D7D35E58D62EA45C93 /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				D84DC0B261A52D761648EA6A /* ChatViewModel.swift */,
+				1F4A10E4B33273BCD764FAF6 /* ConversationListViewModel.swift */,
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
 		758D8BD8D89F5625905717E5 /* Products */ = {
 			isa = PBXGroup;
 			children = (
@@ -75,6 +100,8 @@
 				F8CEA4C82AEAAF9071AFBDD0 /* Models */,
 				31D191CC40F90F9D71325E21 /* Services */,
 				4BA2812BABAFD3ECCBFEEDC6 /* Utilities */,
+				6559E3D7D35E58D62EA45C93 /* ViewModels */,
+				FD90E5F7C661E23556D4EAAE /* Views */,
 			);
 			path = LLMChat;
 			sourceTree = "<group>";
@@ -95,6 +122,19 @@
 				7D86DDBCA2C797608A56CA92 /* LLMChat */,
 				758D8BD8D89F5625905717E5 /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		FD90E5F7C661E23556D4EAAE /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				A50FBB83C4107EA97BFA8B3E /* ChatView.swift */,
+				4C4EE3C92AB9DC504EED8376 /* ConversationListView.swift */,
+				7A3D1F4B9A8102748684AA12 /* MessageBubbleView.swift */,
+				25CD5BFF3E832A594A0B02C5 /* NewChatSheet.swift */,
+				6E4F05C12D81505289903835 /* SettingsView.swift */,
+				D9FDEE1F117F6959F4D6336D /* StreamingIndicator.swift */,
+			);
+			path = Views;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -151,17 +191,25 @@
 			buildActionMask = 2147483647;
 			files = (
 				63ECE76AC15D442EE2B4FA7B /* AnthropicService.swift in Sources */,
+				10BA2910692E728236E42928 /* ChatView.swift in Sources */,
+				3937DCB8796130F75B05D350 /* ChatViewModel.swift in Sources */,
 				4CF8EC4497B26912CEFD77A1 /* ContentView.swift in Sources */,
 				65E5301BE771EC004910EB46 /* Conversation.swift in Sources */,
+				3298CCC491A9075A8A612535 /* ConversationListView.swift in Sources */,
+				2B2E54BA43D52CD30FF31EFF /* ConversationListViewModel.swift in Sources */,
 				89385AE26BC264F5DA601527 /* HapticManager.swift in Sources */,
 				DDE729D28ED6380E1D565A85 /* KeychainManager.swift in Sources */,
 				9C1E4157BC3BB6B0D2FFB03B /* LLMChatApp.swift in Sources */,
 				17D7D3401D46DC8E6F2DA949 /* LLMService.swift in Sources */,
 				EB1F231798E92A6468C75947 /* MarkdownRenderer.swift in Sources */,
 				E019BF779A6F21B58BC3113D /* Message.swift in Sources */,
+				171944231FC31FEBC22BAFEE /* MessageBubbleView.swift in Sources */,
+				C1C577C962F09C913B0900E0 /* NewChatSheet.swift in Sources */,
 				6485A69D6D23F2F6600C31B6 /* OpenAIService.swift in Sources */,
 				846386497DC65E192FE2673C /* Provider.swift in Sources */,
 				D4C46157D7A4EC136867A55C /* ServiceFactory.swift in Sources */,
+				00C1BEB544FAE63D80F55693 /* SettingsView.swift in Sources */,
+				27EF3C43C1905184864F5EFB /* StreamingIndicator.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
