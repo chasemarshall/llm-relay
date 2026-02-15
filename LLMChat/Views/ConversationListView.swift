@@ -8,11 +8,16 @@ struct ConversationListView: View {
     @State private var viewModel = ConversationListViewModel()
     @State private var navigationPath: [Conversation] = []
     @State private var modelManager = ModelManager.shared
+    @State private var renamingConversation: Conversation?
+    @State private var renameText: String = ""
 
     var filteredConversations: [Conversation] {
-        if viewModel.searchText.isEmpty { return conversations }
-        return conversations.filter {
+        let list = viewModel.searchText.isEmpty ? conversations : conversations.filter {
             $0.title.localizedCaseInsensitiveContains(viewModel.searchText)
+        }
+        return list.sorted { a, b in
+            if a.isPinned != b.isPinned { return a.isPinned }
+            return a.updatedAt > b.updatedAt
         }
     }
 
@@ -23,17 +28,57 @@ struct ConversationListView: View {
                     Button {
                         navigationPath = [conversation]
                     } label: {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(conversation.title)
-                                .font(.headline)
-                                .lineLimit(1)
-                            Text(modelManager.modelName(for: conversation.modelId))
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack(spacing: 4) {
+                                    if conversation.isPinned {
+                                        Image(systemName: "pin.fill")
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Text(conversation.title)
+                                        .font(.body)
+                                        .lineLimit(1)
+                                }
+                                HStack(spacing: 6) {
+                                    Text(modelManager.modelName(for: conversation.modelId))
+                                    Text("·")
+                                    Text(timeAgo(conversation.updatedAt))
+                                }
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(.quaternary)
                         }
-                        .padding(.vertical, 2)
                     }
                     .foregroundStyle(.primary)
+                    .contextMenu {
+                        Button {
+                            renameText = conversation.title
+                            renamingConversation = conversation
+                        } label: {
+                            Label("Rename", systemImage: "pencil")
+                        }
+                        Button {
+                            conversation.isPinned.toggle()
+                            try? modelContext.save()
+                        } label: {
+                            Label(conversation.isPinned ? "Unpin" : "Pin", systemImage: conversation.isPinned ? "pin.slash" : "pin")
+                        }
+                        Divider()
+                        Button(role: .destructive) {
+                            if navigationPath.first?.id == conversation.id {
+                                navigationPath = []
+                            }
+                            viewModel.deleteConversation(conversation, modelContext: modelContext)
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                         Button(role: .destructive) {
                             if navigationPath.first?.id == conversation.id {
@@ -49,7 +94,7 @@ struct ConversationListView: View {
             .searchable(text: $viewModel.searchText, prompt: "Search chats")
             .navigationTitle("Chats")
             .navigationDestination(for: Conversation.self) { conversation in
-                ChatView(conversation: conversation, onNewChat: { newChat() })
+                ChatView(conversation: conversation, modelContext: modelContext, onNewChat: { newChat() })
             }
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
@@ -73,7 +118,7 @@ struct ConversationListView: View {
                                 Button {
                                     newChat(agent: agent)
                                 } label: {
-                                    Label(agent.name, systemImage: "person.circle")
+                                    Label(agent.name, systemImage: agent.iconName ?? "person.circle")
                                 }
                             }
                         } label: {
@@ -85,26 +130,58 @@ struct ConversationListView: View {
                     Button {
                         viewModel.showSettings = true
                     } label: {
-                        Image(systemName: "gear")
+                        Image(systemName: "gearshape")
                     }
                 }
             }
             .sheet(isPresented: $viewModel.showSettings) {
                 SettingsView()
             }
+            .alert("Rename Chat", isPresented: Binding(
+                get: { renamingConversation != nil },
+                set: { if !$0 { renamingConversation = nil } }
+            )) {
+                TextField("Chat name", text: $renameText)
+                Button("Cancel", role: .cancel) { renamingConversation = nil }
+                Button("Save") {
+                    let trimmed = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !trimmed.isEmpty, let convo = renamingConversation {
+                        convo.title = trimmed
+                        try? modelContext.save()
+                    }
+                    renamingConversation = nil
+                }
+            }
         }
+    }
+
+    private func timeAgo(_ date: Date) -> String {
+        let seconds = Int(-date.timeIntervalSinceNow)
+        if seconds < 60 { return "just now" }
+        let minutes = seconds / 60
+        if minutes < 60 { return "\(minutes)m" }
+        let hours = minutes / 60
+        if hours < 24 { return "\(hours)h" }
+        let days = hours / 24
+        if days < 7 { return "\(days)d" }
+        let weeks = days / 7
+        return "\(weeks)w"
     }
 
     private func newChat(agent: Agent? = nil) {
         let convo = viewModel.createConversation(
-            modelId: agent?.modelId ?? SettingsManager.defaultModelId,
+            provider: SettingsManager.aiProvider,
+            modelId: agent?.modelId ?? SettingsManager.sessionModelId ?? SettingsManager.defaultModelId,
             systemPrompt: agent?.systemPrompt,
             modelContext: modelContext
         )
         if let agent {
             convo.title = agent.name
         }
-        // Replace the navigation stack so we navigate to the new chat
-        navigationPath = [convo]
+        // Pop to root first, then push after animation completes
+        navigationPath = []
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            navigationPath = [convo]
+        }
     }
 }

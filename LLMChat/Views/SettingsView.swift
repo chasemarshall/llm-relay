@@ -6,8 +6,9 @@ struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Agent.createdAt) private var agents: [Agent]
     @Query(sort: \Memory.createdAt) private var memories: [Memory]
-    @State private var apiKey: String = ""
-    @State private var searchApiKey: String = ""
+    @State private var aiProvider: Provider = .openRouter
+    @State private var aiKeys: [Provider: String] = [:]
+    @State private var searchKeys: [SearchProvider: String] = [:]
     @State private var searchProvider: SearchProvider = .tavily
     @State private var newMemory: String = ""
     @State private var defaultModelId: String = ""
@@ -16,33 +17,39 @@ struct SettingsView: View {
     @State private var showNewAgent = false
     @State private var editingAgent: Agent?
     @State private var showClearChatsAlert = false
+    @State private var hasChanges = false
+    @State private var didLoad = false
 
-    // Track initial values to detect changes
-    @State private var initialApiKey: String = ""
-    @State private var initialSearchApiKey: String = ""
-    @State private var initialSearchProvider: SearchProvider = .tavily
-    @State private var initialModelId: String = ""
-    @State private var initialSystemPrompt: String = ""
+    private var currentAiKey: Binding<String> {
+        Binding(
+            get: { aiKeys[aiProvider] ?? "" },
+            set: { aiKeys[aiProvider] = $0 }
+        )
+    }
 
-    private var hasChanges: Bool {
-        apiKey != initialApiKey ||
-        searchApiKey != initialSearchApiKey ||
-        searchProvider != initialSearchProvider ||
-        defaultModelId != initialModelId ||
-        globalSystemPrompt != initialSystemPrompt
+    private var currentSearchKey: Binding<String> {
+        Binding(
+            get: { searchKeys[searchProvider] ?? "" },
+            set: { searchKeys[searchProvider] = $0 }
+        )
     }
 
     var body: some View {
         NavigationStack {
             Form {
                 Section {
-                    SecureField("API Key", text: $apiKey)
+                    Picker("Provider", selection: $aiProvider) {
+                        ForEach(Provider.allCases) { provider in
+                            Text(provider.displayName).tag(provider)
+                        }
+                    }
+                    SecureField("API Key", text: currentAiKey)
                         .textContentType(.password)
                         .autocorrectionDisabled()
                 } header: {
-                    Text("OpenRouter")
+                    Text("AI Provider")
                 } footer: {
-                    Text("Get your key at openrouter.ai/keys")
+                    Text("Get your key at \(aiProvider.keyPlaceholder)")
                 }
 
                 Section {
@@ -51,7 +58,7 @@ struct SettingsView: View {
                             Text(provider.displayName).tag(provider)
                         }
                     }
-                    SecureField("API Key", text: $searchApiKey)
+                    SecureField("API Key", text: currentSearchKey)
                         .textContentType(.password)
                         .autocorrectionDisabled()
                 } header: {
@@ -91,7 +98,11 @@ struct SettingsView: View {
                         Button {
                             editingAgent = agent
                         } label: {
-                            HStack {
+                            HStack(spacing: 12) {
+                                Image(systemName: agent.iconName ?? "person.circle")
+                                    .font(.title3)
+                                    .foregroundStyle(.secondary)
+                                    .frame(width: 28)
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(agent.name)
                                         .font(.body)
@@ -106,6 +117,7 @@ struct SettingsView: View {
                                     .foregroundStyle(.tertiary)
                             }
                         }
+                        .buttonStyle(.plain)
                         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                             Button(role: .destructive) {
                                 modelContext.delete(agent)
@@ -142,6 +154,7 @@ struct SettingsView: View {
                             Button(role: .destructive) {
                                 modelContext.delete(memory)
                                 try? modelContext.save()
+                                hasChanges = true
                             } label: {
                                 Image(systemName: "trash")
                             }
@@ -157,6 +170,7 @@ struct SettingsView: View {
                             modelContext.insert(memory)
                             try? modelContext.save()
                             newMemory = ""
+                            hasChanges = true
                         } label: {
                             Image(systemName: "plus.circle.fill")
                                 .foregroundColor(.accentColor)
@@ -166,7 +180,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Memories")
                 } footer: {
-                    Text("Facts remembered across all chats. Say \"remember that...\" in a conversation, or add them here.")
+                    Text("Facts remembered across all chats. The model saves memories automatically when you share important details, or add them here.")
                 }
 
                 Section {
@@ -193,19 +207,7 @@ struct SettingsView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button {
-                        if apiKey.isEmpty {
-                            KeychainManager.deleteApiKey()
-                        } else {
-                            KeychainManager.setApiKey(apiKey)
-                        }
-                        if searchApiKey.isEmpty {
-                            KeychainManager.deleteSearchApiKey()
-                        } else {
-                            KeychainManager.setSearchApiKey(searchApiKey)
-                        }
-                        SettingsManager.searchProvider = searchProvider
-                        SettingsManager.defaultModelId = defaultModelId
-                        SettingsManager.globalSystemPrompt = globalSystemPrompt.isEmpty ? nil : globalSystemPrompt
+                        saveSettings()
                         dismiss()
                     } label: {
                         Image(systemName: "checkmark")
@@ -215,17 +217,18 @@ struct SettingsView: View {
                 }
             }
             .onAppear {
-                apiKey = KeychainManager.apiKey() ?? ""
-                searchApiKey = KeychainManager.searchApiKey() ?? ""
-                searchProvider = SettingsManager.searchProvider
-                defaultModelId = SettingsManager.defaultModelId
-                globalSystemPrompt = SettingsManager.globalSystemPrompt ?? ""
-                initialApiKey = apiKey
-                initialSearchApiKey = searchApiKey
-                initialSearchProvider = searchProvider
-                initialModelId = defaultModelId
-                initialSystemPrompt = globalSystemPrompt
+                loadSettings()
             }
+            .onChange(of: aiProvider) {
+                if didLoad { hasChanges = true }
+                modelManager.loadModels(for: aiProvider)
+                defaultModelId = SettingsManager.defaultModelId(for: aiProvider)
+            }
+            .onChange(of: aiKeys) { if didLoad { hasChanges = true } }
+            .onChange(of: searchKeys) { if didLoad { hasChanges = true } }
+            .onChange(of: searchProvider) { if didLoad { hasChanges = true } }
+            .onChange(of: defaultModelId) { if didLoad { hasChanges = true } }
+            .onChange(of: globalSystemPrompt) { if didLoad { hasChanges = true } }
             .sheet(isPresented: $showNewAgent) {
                 AgentEditorView()
             }
@@ -244,5 +247,53 @@ struct SettingsView: View {
                 Text("This will permanently delete all conversations and messages. This cannot be undone.")
             }
         }
+    }
+
+    private func loadSettings() {
+        aiProvider = SettingsManager.aiProvider
+        searchProvider = SettingsManager.searchProvider
+        defaultModelId = SettingsManager.defaultModelId
+        globalSystemPrompt = SettingsManager.globalSystemPrompt ?? ""
+
+        // Load all provider keys
+        for provider in Provider.allCases {
+            aiKeys[provider] = KeychainManager.apiKey(for: provider) ?? ""
+        }
+        for provider in SearchProvider.allCases {
+            searchKeys[provider] = KeychainManager.searchApiKey(for: provider) ?? ""
+        }
+
+        // Load models for current provider
+        modelManager.loadModels(for: aiProvider)
+
+        // Allow change tracking now that initial values are set
+        DispatchQueue.main.async { didLoad = true }
+    }
+
+    private func saveSettings() {
+        // Save AI provider keys
+        for provider in Provider.allCases {
+            let key = aiKeys[provider] ?? ""
+            if key.isEmpty {
+                KeychainManager.deleteApiKey(for: provider)
+            } else {
+                KeychainManager.setApiKey(key, for: provider)
+            }
+        }
+
+        // Save search provider keys
+        for provider in SearchProvider.allCases {
+            let key = searchKeys[provider] ?? ""
+            if key.isEmpty {
+                KeychainManager.deleteSearchApiKey(for: provider)
+            } else {
+                KeychainManager.setSearchApiKey(key, for: provider)
+            }
+        }
+
+        SettingsManager.aiProvider = aiProvider
+        SettingsManager.searchProvider = searchProvider
+        SettingsManager.defaultModelId = defaultModelId
+        SettingsManager.globalSystemPrompt = globalSystemPrompt.isEmpty ? nil : globalSystemPrompt
     }
 }
