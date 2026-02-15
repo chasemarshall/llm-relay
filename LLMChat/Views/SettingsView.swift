@@ -49,7 +49,7 @@ struct SettingsView: View {
                 } header: {
                     Text("AI Provider")
                 } footer: {
-                    Text("Get your key at \(aiProvider.keyPlaceholder)")
+                    Link("Get your key at \(aiProvider.keyPlaceholder)", destination: URL(string: "https://\(aiProvider.keyPlaceholder)")!)
                 }
 
                 Section {
@@ -64,7 +64,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Web Search")
                 } footer: {
-                    Text("Get your key at \(searchProvider.keyPlaceholder)")
+                    Link("Get your key at \(searchProvider.keyPlaceholder)", destination: URL(string: "https://\(searchProvider.keyPlaceholder)")!)
                 }
 
                 Section {
