@@ -98,31 +98,18 @@ struct ConversationListView: View {
             }
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    if agents.isEmpty {
-                        Button {
-                            newChat()
-                        } label: {
-                            Image(systemName: "square.and.pencil")
-                        }
-                    } else {
-                        Menu {
+                    Button {
+                        newChat()
+                    } label: {
+                        Image(systemName: "square.and.pencil")
+                    }
+                    .contextMenu {
+                        ForEach(agents) { agent in
                             Button {
-                                newChat()
+                                newChat(agent: agent)
                             } label: {
-                                Label("New Chat", systemImage: "bubble.left")
+                                Label(agent.name, systemImage: agent.iconName ?? "person.circle")
                             }
-
-                            Divider()
-
-                            ForEach(agents) { agent in
-                                Button {
-                                    newChat(agent: agent)
-                                } label: {
-                                    Label(agent.name, systemImage: agent.iconName ?? "person.circle")
-                                }
-                            }
-                        } label: {
-                            Image(systemName: "square.and.pencil")
                         }
                     }
                 }
