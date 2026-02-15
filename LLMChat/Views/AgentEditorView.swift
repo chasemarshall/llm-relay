@@ -67,12 +67,9 @@ struct AgentEditorView: View {
                         dismiss()
                     } label: {
                         Image(systemName: "checkmark")
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(.white)
-                            .frame(width: 32, height: 32)
-                            .background(.tint, in: Circle())
+                            .fontWeight(.semibold)
+                            .foregroundStyle(isValid ? .blue : .gray)
                     }
-                    .buttonStyle(.glass)
                     .disabled(!isValid)
                 }
             }

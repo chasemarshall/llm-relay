@@ -173,6 +173,7 @@ struct SettingsView: View {
                     Text("Data")
                 }
             }
+            .scrollDismissesKeyboard(.interactively)
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
