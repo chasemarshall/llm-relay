@@ -9,6 +9,8 @@ struct AgentEditorView: View {
     @State private var name: String
     @State private var selectedModelId: String
     @State private var systemPrompt: String
+    @State private var selectedIcon: String?
+    @State private var showIconPicker = false
 
     let existingAgent: Agent?
     let onSave: (() -> Void)?
@@ -19,6 +21,7 @@ struct AgentEditorView: View {
         _name = State(initialValue: agent?.name ?? "")
         _selectedModelId = State(initialValue: agent?.modelId ?? SettingsManager.defaultModelId)
         _systemPrompt = State(initialValue: agent?.systemPrompt ?? "")
+        _selectedIcon = State(initialValue: agent?.iconName)
     }
 
     private var isValid: Bool {
@@ -28,6 +31,28 @@ struct AgentEditorView: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section {
+                    Button {
+                        showIconPicker = true
+                    } label: {
+                        HStack {
+                            Image(systemName: selectedIcon ?? "person.circle")
+                                .font(.title2)
+                                .foregroundStyle(.primary)
+                                .frame(width: 36, height: 36)
+                            Text("Choose Icon")
+                                .foregroundStyle(.primary)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                } header: {
+                    Text("Icon")
+                }
+
                 Section {
                     TextField("e.g. Code Assistant", text: $name)
                 } header: {
@@ -73,6 +98,9 @@ struct AgentEditorView: View {
                     .disabled(!isValid)
                 }
             }
+            .sheet(isPresented: $showIconPicker) {
+                SFSymbolPickerView(selectedIcon: $selectedIcon)
+            }
         }
     }
 
@@ -81,11 +109,13 @@ struct AgentEditorView: View {
             agent.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
             agent.modelId = selectedModelId
             agent.systemPrompt = systemPrompt
+            agent.iconName = selectedIcon
         } else {
             let agent = Agent(
                 name: name.trimmingCharacters(in: .whitespacesAndNewlines),
                 modelId: selectedModelId,
-                systemPrompt: systemPrompt
+                systemPrompt: systemPrompt,
+                iconName: selectedIcon
             )
             modelContext.insert(agent)
         }
