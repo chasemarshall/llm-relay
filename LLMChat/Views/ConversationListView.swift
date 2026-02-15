@@ -98,12 +98,7 @@ struct ConversationListView: View {
             }
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        newChat()
-                    } label: {
-                        Image(systemName: "square.and.pencil")
-                    }
-                    .contextMenu {
+                    Menu {
                         ForEach(agents) { agent in
                             Button {
                                 newChat(agent: agent)
@@ -111,6 +106,10 @@ struct ConversationListView: View {
                                 Label(agent.name, systemImage: agent.iconName ?? "person.circle")
                             }
                         }
+                    } label: {
+                        Image(systemName: "square.and.pencil")
+                    } primaryAction: {
+                        newChat()
                     }
                 }
                 ToolbarItem(placement: .navigationBarLeading) {
