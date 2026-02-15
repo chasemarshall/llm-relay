@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 77;
+	objectVersion = 63;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -19,6 +19,7 @@
 		5537BF2868592255AAF0F670 /* RelayApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 948EF6B3DA85FF1BA8CFC6EE /* RelayApp.swift */; };
 		5727C2376BD0A6ED14B4E746 /* ConversationListViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A329370C6EE0E73C56F1AAB /* ConversationListViewModel.swift */; };
 		5C1DCC0D37710189F9671982 /* SFSymbolPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42F9FF3E468F0687478B796C /* SFSymbolPickerView.swift */; };
+		65FB53E62F4168FD00ACA078 /* AppIcon 3.icon in Resources */ = {isa = PBXBuildFile; fileRef = 65FB53E52F4168FD00ACA078 /* AppIcon 3.icon */; };
 		6676245E0D3740B8A1D4EC83 /* AgentEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C41B9523EA06F0EBEAB34833 /* AgentEditorView.swift */; };
 		752F866FAAAC735A2BA92AA6 /* MemoryManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C162A7896DAC40F0C5701B3 /* MemoryManager.swift */; };
 		7914ED7247842E156C276B56 /* HapticManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0918A1EA5D9E78AA9195C4E /* HapticManager.swift */; };
@@ -55,6 +56,7 @@
 		42F9FF3E468F0687478B796C /* SFSymbolPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SFSymbolPickerView.swift; sourceTree = "<group>"; };
 		4CE9EE48013BCAB2964251F2 /* SearchService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchService.swift; sourceTree = "<group>"; };
 		58BCB56FECBD5CC3F28F092C /* Provider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Provider.swift; sourceTree = "<group>"; };
+		65FB53E52F4168FD00ACA078 /* AppIcon 3.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = "AppIcon 3.icon"; sourceTree = "<group>"; };
 		6EAA6D6BD672AA87CA480E55 /* AnthropicService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnthropicService.swift; sourceTree = "<group>"; };
 		77E2AFDF04FDB751A817678E /* Memory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Memory.swift; sourceTree = "<group>"; };
 		8A840E43C6D30AD4AF4DB1AA /* KeychainManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainManager.swift; sourceTree = "<group>"; };
@@ -63,7 +65,7 @@
 		9F78B686B695D21FF42F00A1 /* ModelManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelManager.swift; sourceTree = "<group>"; };
 		A2C16BE961C550509F0634F5 /* Agent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Agent.swift; sourceTree = "<group>"; };
 		B0918A1EA5D9E78AA9195C4E /* HapticManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HapticManager.swift; sourceTree = "<group>"; };
-		B2640FB004F58617990C7498 /* Relay.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Relay.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B2640FB004F58617990C7498 /* Relay.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Relay.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C009D586F0453E5E3084F6D8 /* LLMService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMService.swift; sourceTree = "<group>"; };
 		C30079E2769103D54AAD0586 /* MarkdownRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownRenderer.swift; sourceTree = "<group>"; };
 		C41B9523EA06F0EBEAB34833 /* AgentEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentEditorView.swift; sourceTree = "<group>"; };
@@ -170,6 +172,7 @@
 		E543C263B165077F89769C48 /* Relay */ = {
 			isa = PBXGroup;
 			children = (
+				65FB53E52F4168FD00ACA078 /* AppIcon 3.icon */,
 				359767A5465051721E7F2076 /* Assets.xcassets */,
 				EBD2B9FCDA33A453DBB69AB7 /* ContentView.swift */,
 				948EF6B3DA85FF1BA8CFC6EE /* RelayApp.swift */,
@@ -223,7 +226,6 @@
 			);
 			mainGroup = DC658091D1A7F7FB428FB8C2;
 			minimizedProjectReferenceProxies = 1;
-			preferredProjectObjectVersion = 77;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -239,6 +241,7 @@
 			files = (
 				2CD67910A1507C38D98F70C2 /* Adobe Express - file-4.png in Resources */,
 				83A8BA29AC759A450A261572 /* Assets.xcassets in Resources */,
+				65FB53E62F4168FD00ACA078 /* AppIcon 3.icon in Resources */,
 				E87FBA9C3B13031B1D6852B2 /* icon.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -405,9 +408,11 @@
 		7CB4F2CB7DAEE9752ED1E360 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "AppIcon 3";
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 362G8DDL89;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_GENERATION_MODE = GeneratedFile;
 				INFOPLIST_KEY_CFBundleDisplayName = Relay;
@@ -419,7 +424,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.relay.app;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.chasefrazier;
 				PRODUCT_NAME = Relay;
 				SDKROOT = iphoneos;
 				SWIFT_STRICT_CONCURRENCY = complete;
@@ -430,9 +435,11 @@
 		F3D9B9C587F1507CA874D0DE /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "AppIcon 3";
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 362G8DDL89;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_GENERATION_MODE = GeneratedFile;
 				INFOPLIST_KEY_CFBundleDisplayName = Relay;
@@ -444,7 +451,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.relay.app;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.chasefrazier;
 				PRODUCT_NAME = Relay;
 				SDKROOT = iphoneos;
 				SWIFT_STRICT_CONCURRENCY = complete;

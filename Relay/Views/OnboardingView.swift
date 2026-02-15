@@ -48,9 +48,13 @@ struct OnboardingView: View {
                         skipOnboarding()
                     } label: {
                         Text("Skip for now")
-                            .font(.subheadline)
+                            .font(.subheadline.weight(.medium))
                             .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
                     }
+                    .buttonStyle(.plain)
+                    .background(.fill.quaternary, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
                 }
             }
             .padding(.horizontal, 24)
