@@ -36,22 +36,28 @@ struct SettingsView: View {
         NavigationStack {
             Form {
                 Section {
-                    SecureField("OpenRouter", text: $apiKey)
+                    SecureField("API Key", text: $apiKey)
                         .textContentType(.password)
                         .autocorrectionDisabled()
-                    Picker("Search Provider", selection: $searchProvider) {
+                } header: {
+                    Text("OpenRouter")
+                } footer: {
+                    Text("Get your key at openrouter.ai/keys")
+                }
+
+                Section {
+                    Picker("Provider", selection: $searchProvider) {
                         ForEach(SearchProvider.allCases, id: \.self) { provider in
                             Text(provider.displayName).tag(provider)
                         }
                     }
-                    .pickerStyle(.segmented)
-                    SecureField("Search API Key", text: $searchApiKey)
+                    SecureField("API Key", text: $searchApiKey)
                         .textContentType(.password)
                         .autocorrectionDisabled()
                 } header: {
-                    Text("API Keys")
+                    Text("Web Search")
                 } footer: {
-                    Text("OpenRouter: openrouter.ai/keys · Search: \(searchProvider.keyPlaceholder)")
+                    Text("Get your key at \(searchProvider.keyPlaceholder)")
                 }
 
                 Section {
