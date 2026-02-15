@@ -164,10 +164,13 @@ struct ConversationListView: View {
         if let agent {
             convo.title = agent.name
         }
-        // Pop to root first, then push after animation completes
-        navigationPath = []
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+        if navigationPath.isEmpty {
             navigationPath = [convo]
+        } else {
+            navigationPath = []
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                navigationPath = [convo]
+            }
         }
     }
 }
