@@ -92,6 +92,14 @@ struct ConversationListView: View {
                 }
             }
             .searchable(text: $viewModel.searchText, prompt: "Search chats")
+            .gesture(
+                DragGesture(minimumDistance: 50)
+                    .onEnded { value in
+                        if value.translation.width < -50 && abs(value.translation.height) < 50 {
+                            newChat()
+                        }
+                    }
+            )
             .navigationTitle("Chats")
             .navigationDestination(for: Conversation.self) { conversation in
                 ChatView(conversation: conversation, modelContext: modelContext, onNewChat: { newChat() })
@@ -99,17 +107,25 @@ struct ConversationListView: View {
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Menu {
-                        ForEach(agents) { agent in
-                            Button {
-                                newChat(agent: agent)
-                            } label: {
-                                Label(agent.name, systemImage: agent.iconName ?? "person.circle")
+                        Button {
+                            newChat()
+                        } label: {
+                            Label("New Chat", systemImage: "bubble.left")
+                        }
+
+                        if !agents.isEmpty {
+                            Divider()
+
+                            ForEach(agents) { agent in
+                                Button {
+                                    newChat(agent: agent)
+                                } label: {
+                                    Label(agent.name, systemImage: agent.iconName ?? "person.circle")
+                                }
                             }
                         }
                     } label: {
                         Image(systemName: "square.and.pencil")
-                    } primaryAction: {
-                        newChat()
                     }
                 }
                 ToolbarItem(placement: .navigationBarLeading) {
