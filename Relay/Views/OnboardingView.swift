@@ -63,7 +63,7 @@ struct OnboardingView: View {
     private var welcomePage: some View {
         VStack(spacing: 16) {
             Spacer()
-            Image("AppIcon")
+            Image("AppIconImage")
                 .resizable()
                 .frame(width: 100, height: 100)
                 .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
