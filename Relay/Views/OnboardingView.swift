@@ -24,6 +24,7 @@ struct OnboardingView: View {
                     } label: {
                         Text("Next")
                             .font(.body.weight(.semibold))
+                            .foregroundStyle(.background)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 14)
                     }
@@ -35,6 +36,7 @@ struct OnboardingView: View {
                     } label: {
                         Text("Get Started")
                             .font(.body.weight(.semibold))
+                            .foregroundStyle(.background)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 14)
                     }
@@ -118,12 +120,12 @@ struct OnboardingView: View {
                     .textContentType(.password)
                     .autocorrectionDisabled()
                     .padding(12)
-                    .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: 10))
+                    .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
 
                 Link("Get your key at \(selectedProvider.keyPlaceholder)",
                      destination: URL(string: "https://\(selectedProvider.keyPlaceholder)")!)
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.blue)
             }
 
             Spacer()
