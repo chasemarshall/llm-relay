@@ -15,6 +15,7 @@ struct ChatView: View {
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var showPhotoPicker = false
     @State private var showModelPicker = false
+    @State private var showScrollToBottom = false
 
     // Cache the UIImage so we're not decoding Data on every frame
     @State private var thumbnailImage: UIImage?
@@ -49,6 +50,14 @@ struct ChatView: View {
                 .padding(.vertical)
             }
             .scrollDismissesKeyboard(.interactively)
+            .onScrollGeometryChange(for: Bool.self) { geometry in
+                let distanceFromBottom = geometry.contentSize.height - geometry.contentOffset.y - geometry.containerSize.height
+                return distanceFromBottom > 200
+            } action: { _, isScrolledUp in
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    showScrollToBottom = isScrolledUp
+                }
+            }
             .onAppear {
                 DispatchQueue.main.async { isInputFocused = true }
             }
@@ -58,6 +67,22 @@ struct ChatView: View {
             }
             .onChange(of: viewModel.streamingText) {
                 scrollToBottom(proxy: proxy)
+            }
+            .overlay(alignment: .bottom) {
+                if showScrollToBottom {
+                    Button {
+                        scrollToBottom(proxy: proxy)
+                    } label: {
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.primary)
+                            .frame(width: 36, height: 36)
+                    }
+                    .buttonStyle(.glass)
+                    .clipShape(Circle())
+                    .padding(.bottom, 80)
+                    .transition(.scale.combined(with: .opacity))
+                }
             }
             .safeAreaInset(edge: .bottom) {
                 inputBar
