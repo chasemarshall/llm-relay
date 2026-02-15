@@ -7,6 +7,8 @@ struct SettingsView: View {
     @Query(sort: \Agent.createdAt) private var agents: [Agent]
     @Query(sort: \Memory.createdAt) private var memories: [Memory]
     @State private var apiKey: String = ""
+    @State private var searchApiKey: String = ""
+    @State private var searchProvider: SearchProvider = .tavily
     @State private var newMemory: String = ""
     @State private var defaultModelId: String = ""
     @State private var globalSystemPrompt: String = ""
@@ -14,32 +16,52 @@ struct SettingsView: View {
     @State private var showNewAgent = false
     @State private var editingAgent: Agent?
 
+    // Track initial values to detect changes
+    @State private var initialApiKey: String = ""
+    @State private var initialSearchApiKey: String = ""
+    @State private var initialSearchProvider: SearchProvider = .tavily
+    @State private var initialModelId: String = ""
+    @State private var initialSystemPrompt: String = ""
+
+    private var hasChanges: Bool {
+        apiKey != initialApiKey ||
+        searchApiKey != initialSearchApiKey ||
+        searchProvider != initialSearchProvider ||
+        defaultModelId != initialModelId ||
+        globalSystemPrompt != initialSystemPrompt
+    }
+
     var body: some View {
         NavigationStack {
             Form {
                 Section {
-                    SecureField("OpenRouter API Key", text: $apiKey)
+                    SecureField("API Key", text: $apiKey)
                         .textContentType(.password)
                         .autocorrectionDisabled()
-
-                    if !apiKey.isEmpty {
-                        HStack {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundStyle(.green)
-                            Text("Key saved")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
                 } header: {
-                    Text("API Key")
+                    Text("OpenRouter")
                 } footer: {
                     Text("Get your key at openrouter.ai/keys")
                 }
 
+                Section {
+                    Picker("Provider", selection: $searchProvider) {
+                        ForEach(SearchProvider.allCases, id: \.self) { provider in
+                            Text(provider.displayName).tag(provider)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    SecureField("API Key", text: $searchApiKey)
+                        .textContentType(.password)
+                        .autocorrectionDisabled()
+                } header: {
+                    Text("Web Search")
+                } footer: {
+                    Text("Get your key at \(searchProvider.keyPlaceholder)")
+                }
+
                 Section("Default Model") {
                     Picker("Model", selection: $defaultModelId) {
-                        // Ensure current selection always has a tag
                         if !modelManager.models.contains(where: { $0.id == defaultModelId }) {
                             Text(defaultModelId).tag(defaultModelId)
                         }
@@ -57,9 +79,9 @@ struct SettingsView: View {
                     TextEditor(text: $globalSystemPrompt)
                         .frame(minHeight: 80)
                 } header: {
-                    Text("Global System Prompt")
+                    Text("System Prompt")
                 } footer: {
-                    Text("Applied to all new chats unless overridden")
+                    Text("Applied to all new chats unless overridden by an agent")
                 }
 
                 Section {
@@ -67,28 +89,27 @@ struct SettingsView: View {
                         Button {
                             editingAgent = agent
                         } label: {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(agent.name)
-                                    .font(.headline)
-                                    .foregroundStyle(.primary)
-                                Text(modelManager.modelName(for: agent.modelId))
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                if !agent.systemPrompt.isEmpty {
-                                    Text(agent.systemPrompt)
-                                        .font(.caption2)
-                                        .foregroundStyle(.tertiary)
-                                        .lineLimit(2)
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(agent.name)
+                                        .font(.body)
+                                        .foregroundStyle(.primary)
+                                    Text(modelManager.modelName(for: agent.modelId))
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
                                 }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundStyle(.tertiary)
                             }
-                            .padding(.vertical, 2)
                         }
                         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                             Button(role: .destructive) {
                                 modelContext.delete(agent)
                                 try? modelContext.save()
                             } label: {
-                                Label("Delete", systemImage: "trash")
+                                Image(systemName: "trash")
                             }
                         }
                     }
@@ -96,12 +117,10 @@ struct SettingsView: View {
                     Button {
                         showNewAgent = true
                     } label: {
-                        Label("Create Agent", systemImage: "plus")
+                        Label("New Agent", systemImage: "plus")
                     }
                 } header: {
                     Text("Agents")
-                } footer: {
-                    Text("Custom agents with their own model and instructions")
                 }
 
                 Section {
@@ -112,7 +131,7 @@ struct SettingsView: View {
                             HStack(spacing: 4) {
                                 Image(systemName: memory.source == "auto" ? "sparkles" : "hand.draw")
                                     .font(.system(size: 9))
-                                Text(memory.source == "auto" ? "Auto" : "Manual")
+                                Text(memory.source == "auto" ? "Learned" : "Added by you")
                                     .font(.caption2)
                             }
                             .foregroundStyle(.tertiary)
@@ -145,29 +164,54 @@ struct SettingsView: View {
                 } header: {
                     Text("Memories")
                 } footer: {
-                    Text("The AI automatically learns facts about you, or say \"remember that...\" in chat. You can also add memories manually here.")
+                    Text("Facts remembered across all chats. Say \"remember that...\" in a conversation, or add them here.")
                 }
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .fontWeight(.medium)
+                    }
+                }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
+                    Button {
                         if apiKey.isEmpty {
                             KeychainManager.deleteApiKey()
                         } else {
                             KeychainManager.setApiKey(apiKey)
                         }
+                        if searchApiKey.isEmpty {
+                            KeychainManager.deleteSearchApiKey()
+                        } else {
+                            KeychainManager.setSearchApiKey(searchApiKey)
+                        }
+                        SettingsManager.searchProvider = searchProvider
                         SettingsManager.defaultModelId = defaultModelId
                         SettingsManager.globalSystemPrompt = globalSystemPrompt.isEmpty ? nil : globalSystemPrompt
                         dismiss()
+                    } label: {
+                        Image(systemName: "checkmark")
+                            .fontWeight(.semibold)
+                            .foregroundStyle(hasChanges ? .blue : .gray)
                     }
                 }
             }
             .onAppear {
                 apiKey = KeychainManager.apiKey() ?? ""
+                searchApiKey = KeychainManager.searchApiKey() ?? ""
+                searchProvider = SettingsManager.searchProvider
                 defaultModelId = SettingsManager.defaultModelId
                 globalSystemPrompt = SettingsManager.globalSystemPrompt ?? ""
+                initialApiKey = apiKey
+                initialSearchApiKey = searchApiKey
+                initialSearchProvider = searchProvider
+                initialModelId = defaultModelId
+                initialSystemPrompt = globalSystemPrompt
             }
             .sheet(isPresented: $showNewAgent) {
                 AgentEditorView()
