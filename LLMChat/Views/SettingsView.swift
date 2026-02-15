@@ -15,6 +15,7 @@ struct SettingsView: View {
     @State private var modelManager = ModelManager.shared
     @State private var showNewAgent = false
     @State private var editingAgent: Agent?
+    @State private var showClearChatsAlert = false
 
     // Track initial values to detect changes
     @State private var initialApiKey: String = ""
@@ -161,6 +162,16 @@ struct SettingsView: View {
                 } footer: {
                     Text("Facts remembered across all chats. Say \"remember that...\" in a conversation, or add them here.")
                 }
+
+                Section {
+                    Button(role: .destructive) {
+                        showClearChatsAlert = true
+                    } label: {
+                        Text("Clear All Chats")
+                    }
+                } header: {
+                    Text("Data")
+                }
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
@@ -213,6 +224,17 @@ struct SettingsView: View {
             }
             .sheet(item: $editingAgent) { agent in
                 AgentEditorView(agent: agent)
+            }
+            .alert("Clear All Chats?", isPresented: $showClearChatsAlert) {
+                Button("Cancel", role: .cancel) { }
+                Button("Clear All", role: .destructive) {
+                    do {
+                        try modelContext.delete(model: Conversation.self)
+                        try modelContext.save()
+                    } catch { }
+                }
+            } message: {
+                Text("This will permanently delete all conversations and messages. This cannot be undone.")
             }
         }
     }
