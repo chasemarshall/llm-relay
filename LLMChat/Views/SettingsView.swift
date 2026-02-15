@@ -53,7 +53,7 @@ struct SettingsView: View {
                     Text("OpenRouter: openrouter.ai/keys · Search: \(searchProvider.keyPlaceholder)")
                 }
 
-                Section("Default Model") {
+                Section {
                     Picker("Model", selection: $defaultModelId) {
                         if !modelManager.models.contains(where: { $0.id == defaultModelId }) {
                             Text(defaultModelId).tag(defaultModelId)
@@ -66,6 +66,8 @@ struct SettingsView: View {
                             }
                         }
                     }
+                } header: {
+                    Text("Default Model")
                 }
 
                 Section {

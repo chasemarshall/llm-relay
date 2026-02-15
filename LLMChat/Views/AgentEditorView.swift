@@ -28,11 +28,13 @@ struct AgentEditorView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Name") {
+                Section {
                     TextField("e.g. Code Assistant", text: $name)
+                } header: {
+                    Text("Name")
                 }
 
-                Section("Model") {
+                Section {
                     Picker("Model", selection: $selectedModelId) {
                         ForEach(modelManager.groupedModels) { group in
                             Section(group.displayName) {
@@ -42,6 +44,8 @@ struct AgentEditorView: View {
                             }
                         }
                     }
+                } header: {
+                    Text("Model")
                 }
 
                 Section {
@@ -50,21 +54,25 @@ struct AgentEditorView: View {
                 } header: {
                     Text("Instructions")
                 } footer: {
-                    Text("Tell the agent how to behave, what to know, and how to respond")
+                    Text("Tell the agent how to behave and respond")
                 }
             }
             .navigationTitle(existingAgent == nil ? "New Agent" : "Edit Agent")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
+                    Button {
                         save()
                         onSave?()
                         dismiss()
+                    } label: {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(.white)
+                            .frame(width: 32, height: 32)
+                            .background(.tint, in: Circle())
                     }
+                    .buttonStyle(.glass)
                     .disabled(!isValid)
                 }
             }
