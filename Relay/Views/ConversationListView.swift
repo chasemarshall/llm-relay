@@ -171,11 +171,10 @@ struct ConversationListView: View {
     }
 
     private func newChat(agent: Agent? = nil) {
-        let convo = viewModel.createConversation(
+        let convo = viewModel.makeDraftConversation(
             provider: SettingsManager.aiProvider,
             modelId: agent?.modelId ?? SettingsManager.sessionModelId ?? SettingsManager.defaultModelId,
-            systemPrompt: agent?.systemPrompt,
-            modelContext: modelContext
+            systemPrompt: agent?.systemPrompt
         )
         if let agent {
             convo.title = agent.name

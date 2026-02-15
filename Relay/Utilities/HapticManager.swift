@@ -1,5 +1,6 @@
 import UIKit
 
+@MainActor
 enum HapticManager {
     static func send() {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -11,5 +12,9 @@ enum HapticManager {
 
     static func error() {
         UINotificationFeedbackGenerator().notificationOccurred(.error)
+    }
+
+    static func light() {
+        UIImpactFeedbackGenerator(style: .soft).impactOccurred()
     }
 }

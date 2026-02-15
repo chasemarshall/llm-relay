@@ -2,7 +2,7 @@ import SwiftUI
 import SwiftData
 
 @main
-struct LLMChatApp: App {
+struct RelayApp: App {
     init() {
         // Ensure Application Support directory exists to prevent CoreData errors
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!

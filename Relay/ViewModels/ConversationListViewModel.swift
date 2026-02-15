@@ -6,17 +6,15 @@ final class ConversationListViewModel {
     var searchText: String = ""
     var showSettings: Bool = false
 
-    func createConversation(
+    func makeDraftConversation(
+        provider: Provider = .openRouter,
         modelId: String,
-        systemPrompt: String?,
-        modelContext: ModelContext
+        systemPrompt: String?
     ) -> Conversation {
-        let convo = Conversation(modelId: modelId)
+        let convo = Conversation(provider: provider, modelId: modelId)
         if let prompt = systemPrompt, !prompt.isEmpty {
             convo.systemPrompt = prompt
         }
-        modelContext.insert(convo)
-        try? modelContext.save()
         return convo
     }
 

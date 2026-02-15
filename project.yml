@@ -1,26 +1,30 @@
-name: LLMChat
+name: Relay
 options:
-  bundleIdPrefix: com.llmchat
+  bundleIdPrefix: com.relay
   deploymentTarget:
     iOS: "26.0"
   xcodeVersion: "16.0"
 settings:
   SWIFT_VERSION: "6.0"
 targets:
-  LLMChat:
+  Relay:
     type: application
     platform: iOS
     sources:
-      - path: LLMChat
+      - path: Relay
         excludes:
           - "**/.gitkeep"
     settings:
-      PRODUCT_BUNDLE_IDENTIFIER: com.llmchat.app
-      PRODUCT_NAME: LLMChat
-      INFOPLIST_KEY_CFBundleDisplayName: Plex
+      PRODUCT_BUNDLE_IDENTIFIER: com.relay.app
+      PRODUCT_NAME: Relay
+      INFOPLIST_KEY_CFBundleDisplayName: Relay
       INFOPLIST_GENERATION_MODE: GeneratedFile
       MARKETING_VERSION: "1.0.0"
       CURRENT_PROJECT_VERSION: "1"
       GENERATE_INFOPLIST_FILE: true
       SWIFT_STRICT_CONCURRENCY: complete
       INFOPLIST_KEY_UILaunchScreen_Generation: true
+      ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+      INFOPLIST_KEY_UIRequiresFullScreen: true
+      INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait"
+      INFOPLIST_KEY_UISupportedInterfaceOrientations~ipad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"

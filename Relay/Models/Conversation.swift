@@ -10,6 +10,7 @@ final class Conversation {
     var modelId: String
     var createdAt: Date
     var updatedAt: Date
+    var isPinned: Bool = false
 
     @Relationship(deleteRule: .cascade, inverse: \Message.conversation)
     var messages: [Message]
@@ -27,6 +28,7 @@ final class Conversation {
         self.modelId = modelId ?? SettingsManager.defaultModelId
         self.createdAt = Date()
         self.updatedAt = Date()
+        self.isPinned = false
         self.messages = []
     }
 }

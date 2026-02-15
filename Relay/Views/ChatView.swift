@@ -14,6 +14,7 @@ struct ChatView: View {
     @State private var viewModel: ChatViewModel
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var showPhotoPicker = false
+    @State private var showModelPicker = false
 
     // Cache the UIImage so we're not decoding Data on every frame
     @State private var thumbnailImage: UIImage?
@@ -83,38 +84,8 @@ struct ChatView: View {
     }
 
     private var modelPicker: some View {
-        Menu {
-            if !agents.isEmpty {
-                Section("Agents") {
-                    ForEach(agents) { agent in
-                        Button {
-                            conversation.modelId = agent.modelId
-                            conversation.systemPrompt = agent.systemPrompt
-                            SettingsManager.sessionModelId = agent.modelId
-                            try? modelContext.save()
-                        } label: {
-                            Label(agent.name, systemImage: agent.iconName ?? "person.circle")
-                        }
-                    }
-                }
-            }
-            ForEach(modelManager.groupedModels) { group in
-                Section(group.displayName) {
-                    ForEach(group.models) { model in
-                        Button {
-                            conversation.modelId = model.id
-                            SettingsManager.sessionModelId = model.id
-                            try? modelContext.save()
-                        } label: {
-                            if model.id == conversation.modelId {
-                                Label(model.name, systemImage: "checkmark")
-                            } else {
-                                Text(model.name)
-                            }
-                        }
-                    }
-                }
-            }
+        Button {
+            showModelPicker.toggle()
         } label: {
             HStack(spacing: 6) {
                 Text(modelManager.modelName(for: conversation.modelId))
@@ -125,6 +96,126 @@ struct ChatView: View {
             .foregroundStyle(.primary)
         }
         .buttonStyle(.glass)
+        .popover(isPresented: $showModelPicker) {
+            modelPickerContent
+                .presentationCompactAdaptation(.popover)
+        }
+    }
+
+    private var modelPickerContent: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 2) {
+                if !agents.isEmpty {
+                    DisclosureGroup {
+                        ForEach(agents) { agent in
+                            modelRow(
+                                name: agent.name,
+                                isSelected: conversation.modelId == agent.modelId
+                            ) {
+                                conversation.modelId = agent.modelId
+                                conversation.systemPrompt = agent.systemPrompt
+                                SettingsManager.sessionModelId = agent.modelId
+                                if conversation.modelContext != nil {
+                                    try? modelContext.save()
+                                }
+                                showModelPicker = false
+                            }
+                        }
+                    } label: {
+                        providerLabel("Agents", icon: "person.2.fill")
+                    }
+                    .tint(.secondary)
+                    .padding(.horizontal, 12)
+                }
+
+                ForEach(modelManager.groupedModels) { group in
+                    let containsSelected = group.models.contains { $0.id == conversation.modelId }
+
+                    DisclosureGroup {
+                        ForEach(group.models) { model in
+                            modelRow(
+                                name: model.name,
+                                isSelected: model.id == conversation.modelId
+                            ) {
+                                conversation.modelId = model.id
+                                SettingsManager.sessionModelId = model.id
+                                if conversation.modelContext != nil {
+                                    try? modelContext.save()
+                                }
+                                showModelPicker = false
+                            }
+                        }
+                    } label: {
+                        providerLabel(
+                            group.displayName,
+                            icon: providerIcon(for: group.provider),
+                            isActive: containsSelected
+                        )
+                    }
+                    .tint(.secondary)
+                    .padding(.horizontal, 12)
+                }
+            }
+            .padding(.vertical, 8)
+        }
+        .frame(width: 280)
+        .frame(maxHeight: 420)
+    }
+
+    private func providerLabel(_ title: String, icon: String, isActive: Bool = false) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.body)
+                .foregroundStyle(isActive ? Color.accentColor : .secondary)
+                .frame(width: 22)
+            Text(title)
+                .font(.body.weight(.medium))
+                .foregroundStyle(isActive ? Color.accentColor : .primary)
+            if isActive {
+                Circle()
+                    .fill(Color.accentColor)
+                    .frame(width: 6, height: 6)
+            }
+        }
+        .padding(.vertical, 6)
+    }
+
+    private func modelRow(name: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack {
+                Text(name)
+                    .font(.subheadline)
+                Spacer()
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Color.accentColor)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(
+                isSelected
+                    ? Color.accentColor.opacity(0.1)
+                    : Color.clear,
+                in: RoundedRectangle(cornerRadius: 22, style: .continuous)
+            )
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(isSelected ? Color.accentColor : .primary)
+    }
+
+    private func providerIcon(for provider: String) -> String {
+        switch provider {
+        case "anthropic": return "brain"
+        case "openai": return "sparkles"
+        case "google": return "globe"
+        case "meta-llama": return "flame"
+        case "mistralai": return "wind"
+        case "deepseek": return "water.waves"
+        case "x-ai": return "xmark.circle"
+        default: return "cpu"
+        }
     }
 
     // MARK: - Input bar
@@ -294,7 +385,7 @@ struct ChatView: View {
     }
 
     private func cleanUpIfEmpty() {
-        guard conversation.messages.isEmpty else { return }
+        guard conversation.messages.isEmpty, conversation.modelContext != nil else { return }
         modelContext.delete(conversation)
         try? modelContext.save()
     }
