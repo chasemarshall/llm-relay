@@ -92,10 +92,14 @@ struct ConversationListView: View {
                 }
             }
             .searchable(text: $viewModel.searchText, prompt: "Search chats")
-            .gesture(
-                DragGesture(minimumDistance: 50)
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 60)
                     .onEnded { value in
-                        if value.translation.width < -50 && abs(value.translation.height) < 50 {
+                        // Only trigger if swipe started from the right edge of the screen
+                        let screenWidth = UIScreen.main.bounds.width
+                        if value.startLocation.x > screenWidth * 0.7
+                            && value.translation.width < -60
+                            && abs(value.translation.height) < 50 {
                             newChat()
                         }
                     }
