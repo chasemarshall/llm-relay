@@ -5,10 +5,10 @@ import SwiftData
 enum MemoryManager {
 
     /// Save a memory fact
-    static func saveMemory(_ content: String, modelContext: ModelContext) {
+    static func saveMemory(_ content: String, modelContext: ModelContext) throws {
         // Skip if too similar to an existing memory
         let descriptor = FetchDescriptor<Memory>(sortBy: [SortDescriptor(\.createdAt)])
-        let existing = (try? modelContext.fetch(descriptor)) ?? []
+        let existing = try modelContext.fetch(descriptor)
         let isDuplicate = existing.contains { mem in
             mem.content.lowercased() == content.lowercased() ||
             mem.content.lowercased().contains(content.lowercased()) ||
@@ -18,13 +18,13 @@ enum MemoryManager {
 
         let memory = Memory(content: content, source: "auto")
         modelContext.insert(memory)
-        try? modelContext.save()
+        try modelContext.save()
     }
 
     /// Forget memories matching a query
-    static func forgetMemories(matching query: String, modelContext: ModelContext) -> Int {
+    static func forgetMemories(matching query: String, modelContext: ModelContext) throws -> Int {
         let descriptor = FetchDescriptor<Memory>()
-        guard let memories = try? modelContext.fetch(descriptor) else { return 0 }
+        let memories = try modelContext.fetch(descriptor)
 
         let queryLower = query.lowercased()
         var deletedCount = 0
@@ -35,7 +35,7 @@ enum MemoryManager {
             }
         }
         if deletedCount > 0 {
-            try? modelContext.save()
+            try modelContext.save()
         }
         return deletedCount
     }

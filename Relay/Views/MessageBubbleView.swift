@@ -18,7 +18,7 @@ struct BloomModifier: ViewModifier {
     }
 
     private func startPulse() {
-        withAnimation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true)) {
+        withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) {
             phase = true
         }
     }
@@ -56,7 +56,7 @@ struct MessageBubbleView: View {
         if message.isError {
             return .red.opacity(0.15)
         }
-        return isUser ? .accentColor : Color(.systemGray5)
+        return isUser ? AppTheme.Colors.userBubble : AppTheme.Colors.assistantBubble
     }
 
     private var textColor: Color {
@@ -70,7 +70,7 @@ struct MessageBubbleView: View {
         HStack {
             if isUser { Spacer(minLength: 60) }
 
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.xSmall) {
                 // Search sources disclosure
                 if hasSources || isSearchingPhase {
                     searchSection
@@ -137,9 +137,9 @@ struct MessageBubbleView: View {
 
     @ViewBuilder
     private var thinkingSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.xSmall) {
             Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
+                withAnimation(.easeInOut(duration: AppTheme.Motion.standard)) {
                     showThinking.toggle()
                 }
             } label: {
@@ -159,9 +159,13 @@ struct MessageBubbleView: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(Color(.systemGray6), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .padding(.horizontal, AppTheme.Spacing.medium)
+        .padding(.vertical, AppTheme.Spacing.small)
+        .background(AppTheme.Colors.elevatedSurface, in: RoundedRectangle(cornerRadius: AppTheme.Radius.card, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: AppTheme.Radius.card, style: .continuous)
+                .stroke(AppTheme.Colors.subtleBorder.opacity(0.35), lineWidth: AppTheme.Border.hairline)
+        }
     }
 
     // MARK: - Search Section
@@ -169,9 +173,9 @@ struct MessageBubbleView: View {
     @ViewBuilder
     private var searchSection: some View {
         let isActive = isSearchingPhase && !hasSources
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.xSmall) {
             Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
+                withAnimation(.easeInOut(duration: AppTheme.Motion.standard)) {
                     showSources.toggle()
                 }
             } label: {
@@ -219,9 +223,13 @@ struct MessageBubbleView: View {
                 }
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(Color(.systemGray6), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .padding(.horizontal, AppTheme.Spacing.medium)
+        .padding(.vertical, AppTheme.Spacing.small)
+        .background(AppTheme.Colors.elevatedSurface, in: RoundedRectangle(cornerRadius: AppTheme.Radius.card, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: AppTheme.Radius.card, style: .continuous)
+                .stroke(AppTheme.Colors.subtleBorder.opacity(0.35), lineWidth: AppTheme.Border.hairline)
+        }
     }
 
     // MARK: - Main Bubble
@@ -253,8 +261,8 @@ struct MessageBubbleView: View {
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .modifier(BloomModifier(isActive: true))
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
+                .padding(.horizontal, AppTheme.Spacing.medium)
+                .padding(.vertical, AppTheme.Spacing.small)
                 .background(bubbleColor, in: bubbleShape(isShort: true))
         } else if message.isError {
             HStack(spacing: 6) {
@@ -266,6 +274,9 @@ struct MessageBubbleView: View {
             .padding(.horizontal, isShort ? 16 : 14)
             .padding(.vertical, isShort ? 10 : 12)
             .background(bubbleColor, in: bubbleShape(isShort: isShort))
+            .overlay {
+                bubbleStroke
+            }
         } else if hasImage {
             VStack(alignment: isUser ? .trailing : .leading, spacing: 6) {
                 imageContent
@@ -276,27 +287,44 @@ struct MessageBubbleView: View {
             }
             .padding(8)
             .background(bubbleColor, in: bubbleShape(isShort: false))
+            .overlay {
+                bubbleStroke
+            }
         } else if isStreaming && !isUser {
             VStack(alignment: .leading, spacing: 6) {
                 Text(MarkdownRenderer.render(content))
                     .foregroundStyle(textColor)
                     .contentTransition(.interpolate)
-                    .animation(.easeOut(duration: 0.15), value: content)
+                    .animation(.easeOut(duration: AppTheme.Motion.quick), value: content)
                 if isWaitingForToken {
                     StreamingIndicator()
                         .transition(.opacity)
                 }
             }
-            .animation(.easeInOut(duration: 0.15), value: isWaitingForToken)
-            .padding(.horizontal, 14)
+            .animation(.easeInOut(duration: AppTheme.Motion.quick), value: isWaitingForToken)
+            .padding(.horizontal, AppTheme.Spacing.medium)
             .padding(.vertical, 12)
             .background(bubbleColor, in: bubbleShape(isShort: false))
+            .overlay {
+                bubbleStroke
+            }
         } else if !isEmpty {
             Text(MarkdownRenderer.render(content))
                 .foregroundStyle(textColor)
                 .padding(.horizontal, isShort ? 16 : 14)
                 .padding(.vertical, isShort ? 10 : 12)
                 .background(bubbleColor, in: bubbleShape(isShort: isShort))
+                .overlay {
+                    bubbleStroke
+                }
+        }
+    }
+
+    @ViewBuilder
+    private var bubbleStroke: some View {
+        if !isUser && !message.isError {
+            RoundedRectangle(cornerRadius: AppTheme.Radius.bubble, style: .continuous)
+                .stroke(AppTheme.Colors.subtleBorder.opacity(0.35), lineWidth: AppTheme.Border.hairline)
         }
     }
 
@@ -334,7 +362,7 @@ struct MessageBubbleView: View {
 
     private func bubbleShape(isShort: Bool) -> some Shape {
         RoundedRectangle(
-            cornerRadius: 22,
+            cornerRadius: AppTheme.Radius.bubble,
             style: .continuous
         )
     }

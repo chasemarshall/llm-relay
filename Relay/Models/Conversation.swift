@@ -25,7 +25,7 @@ final class Conversation {
         self.title = title
         self.systemPrompt = systemPrompt
         self.providerRaw = provider.rawValue
-        self.modelId = modelId ?? SettingsManager.defaultModelId
+        self.modelId = modelId ?? SettingsManager.defaultModelIdForProvider(provider)
         self.createdAt = Date()
         self.updatedAt = Date()
         self.isPinned = false

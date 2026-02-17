@@ -25,39 +25,75 @@ final class AnthropicService: LLMService, @unchecked Sendable {
                     request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
                     request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
 
-                    // Separate system message from conversation messages
                     var systemText: String?
                     var conversationMessages: [[String: Any]] = []
 
                     for msg in messages {
                         if msg.role == "system" {
-                            // Anthropic uses system as a top-level parameter
                             if let existing = systemText {
                                 systemText = existing + "\n\n" + msg.content
                             } else {
                                 systemText = msg.content
                             }
-                        } else {
-                            if let base64 = msg.imageBase64 {
-                                let content: [[String: Any]] = [
-                                    ["type": "text", "text": msg.content],
-                                    ["type": "image", "source": [
-                                        "type": "base64",
-                                        "media_type": "image/jpeg",
-                                        "data": base64
-                                    ]]
-                                ]
-                                conversationMessages.append([
-                                    "role": msg.role,
-                                    "content": content
-                                ] as [String: Any])
-                            } else {
-                                conversationMessages.append([
-                                    "role": msg.role,
+                            continue
+                        }
+
+                        // Anthropic tool result message
+                        if let toolCallId = msg.toolCallId {
+                            conversationMessages.append([
+                                "role": "user",
+                                "content": [[
+                                    "type": "tool_result",
+                                    "tool_use_id": toolCallId,
                                     "content": msg.content
+                                ]]
+                            ])
+                            continue
+                        }
+
+                        // Anthropic assistant tool calls
+                        if msg.role == "assistant", let toolCalls = msg.toolCalls, !toolCalls.isEmpty {
+                            var content: [[String: Any]] = []
+                            if !msg.content.isEmpty {
+                                content.append(["type": "text", "text": msg.content])
+                            }
+                            for call in toolCalls {
+                                content.append([
+                                    "type": "tool_use",
+                                    "id": call.id,
+                                    "name": call.name,
+                                    "input": parseToolInput(call.arguments)
                                 ])
                             }
+                            conversationMessages.append([
+                                "role": "assistant",
+                                "content": content
+                            ])
+                            continue
                         }
+
+                        // Image message
+                        if let base64 = msg.imageBase64 {
+                            let content: [[String: Any]] = [
+                                ["type": "text", "text": msg.content],
+                                ["type": "image", "source": [
+                                    "type": "base64",
+                                    "media_type": "image/jpeg",
+                                    "data": base64
+                                ]]
+                            ]
+                            conversationMessages.append([
+                                "role": msg.role,
+                                "content": content
+                            ])
+                            continue
+                        }
+
+                        // Standard text message
+                        conversationMessages.append([
+                            "role": msg.role,
+                            "content": msg.content
+                        ])
                     }
 
                     var body: [String: Any] = [
@@ -68,6 +104,22 @@ final class AnthropicService: LLMService, @unchecked Sendable {
                     ]
                     if let systemText {
                         body["system"] = systemText
+                    }
+
+                    if !tools.isEmpty {
+                        body["tools"] = tools.map { tool in
+                            [
+                                "name": tool.name,
+                                "description": tool.description,
+                                "input_schema": tool.parameters
+                            ] as [String: Any]
+                        }
+                        if let forceToolName {
+                            body["tool_choice"] = [
+                                "type": "tool",
+                                "name": forceToolName
+                            ]
+                        }
                     }
 
                     request.httpBody = try JSONSerialization.data(withJSONObject: body)
@@ -120,7 +172,19 @@ final class AnthropicService: LLMService, @unchecked Sendable {
                                let inputTokens = usage["input_tokens"] as? Int {
                                 promptTokens = inputTokens
                             }
+                        case "content_block_start":
+                            guard let index = json["index"] as? Int,
+                                  let block = json["content_block"] as? [String: Any],
+                                  let blockType = block["type"] as? String,
+                                  blockType == "tool_use" else { continue }
+
+                            let id = block["id"] as? String
+                            let name = block["name"] as? String
+                            let arguments = toolInputJSONString(from: block["input"])
+                            continuation.yield(.toolCall(index: index, id: id, name: name, arguments: arguments))
+
                         case "content_block_delta":
+                            let index = json["index"] as? Int ?? 0
                             guard let delta = json["delta"] as? [String: Any],
                                   let deltaType = delta["type"] as? String else { continue }
 
@@ -133,10 +197,19 @@ final class AnthropicService: LLMService, @unchecked Sendable {
                                 if let thinking = delta["thinking"] as? String {
                                     continuation.yield(.reasoning(thinking))
                                 }
+                            case "input_json_delta":
+                                if let partial = delta["partial_json"] as? String {
+                                    continuation.yield(.toolCall(index: index, id: nil, name: nil, arguments: partial))
+                                }
                             default:
                                 break
                             }
                         case "message_delta":
+                            if let delta = json["delta"] as? [String: Any],
+                               let stopReason = delta["stop_reason"] as? String {
+                                continuation.yield(.finishReason(mapStopReason(stopReason)))
+                            }
+
                             if let usage = json["usage"] as? [String: Any],
                                let outputTokens = usage["output_tokens"] as? Int {
                                 continuation.yield(.usage(
@@ -161,6 +234,39 @@ final class AnthropicService: LLMService, @unchecked Sendable {
                 }
             }
             continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+
+    private func parseToolInput(_ arguments: String) -> [String: Any] {
+        guard let data = arguments.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return [:]
+        }
+        return json
+    }
+
+    private func toolInputJSONString(from input: Any?) -> String? {
+        guard let input else { return nil }
+        if let text = input as? String {
+            return text
+        }
+        if let dictionary = input as? [String: Any], dictionary.isEmpty {
+            return nil
+        }
+        guard JSONSerialization.isValidJSONObject(input),
+              let data = try? JSONSerialization.data(withJSONObject: input),
+              let text = String(data: data, encoding: .utf8) else {
+            return nil
+        }
+        return text
+    }
+
+    private func mapStopReason(_ stopReason: String) -> String {
+        switch stopReason {
+        case "tool_use": "tool_calls"
+        case "end_turn": "stop"
+        case "max_tokens": "length"
+        default: stopReason
         }
     }
 }

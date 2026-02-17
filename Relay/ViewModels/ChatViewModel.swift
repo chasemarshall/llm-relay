@@ -17,6 +17,7 @@ final class ChatViewModel {
     var streamingPhase: StreamingPhase = .idle
     var isWaitingForToken: Bool = false
     var searchEnabled: Bool = false
+    var uiErrorMessage: String?
     var selectedImageData: Data?
     private var streamTask: Task<Void, Never>?
     private var modelContext: ModelContext
@@ -93,7 +94,7 @@ final class ChatViewModel {
         conversation.messages.append(userMessage)
 
         conversation.updatedAt = Date()
-        try? modelContext.save()
+        saveContext(or: "Couldn't save your message.")
 
         let isFirstMessage = conversation.messages.filter({ $0.messageRole == .user }).count == 1
         streamResponse()
@@ -109,7 +110,7 @@ final class ChatViewModel {
             let errorMsg = Message(role: .assistant, content: "No API key set. Go to Settings to add your \(provider.displayName) key.", isError: true)
             errorMsg.conversation = conversation
             conversation.messages.append(errorMsg)
-            try? modelContext.save()
+            saveContext(or: "Couldn't save the API key error message.")
             HapticManager.error()
             return
         }
@@ -128,7 +129,8 @@ final class ChatViewModel {
             do {
                 let baseChatMessages = buildChatMessages(excluding: assistantMessage)
                 var tools: [ToolDefinition] = [Self.saveMemoryTool, Self.forgetMemoryTool]
-                if KeychainManager.searchApiKey() != nil {
+                let searchToolEnabled = shouldSearch && KeychainManager.searchApiKey() != nil
+                if searchToolEnabled {
                     tools.append(Self.searchTool)
                 }
 
@@ -137,7 +139,7 @@ final class ChatViewModel {
                 var iteration = 0
 
                 while iteration < Self.maxToolIterations {
-                    let forceToolName: String? = (shouldSearch && iteration == 0 && !tools.isEmpty) ? "web_search" : nil
+                    let forceToolName: String? = (searchToolEnabled && iteration == 0) ? "web_search" : nil
 
                     streamingPhase = .thinking
                     tokenBuffer = ""
@@ -245,7 +247,11 @@ final class ChatViewModel {
                 HapticManager.receive()
             } catch {
                 flushBuffers(to: assistantMessage)
-                assistantMessage.content = error.localizedDescription
+                var errorText = error.localizedDescription
+                if let statusNote = await Self.checkProviderStatusNote(for: provider) {
+                    errorText += "\n\n\(statusNote)"
+                }
+                assistantMessage.content = errorText
                 assistantMessage.isError = true
                 HapticManager.error()
             }
@@ -253,7 +259,7 @@ final class ChatViewModel {
             isStreaming = false
             streamingPhase = .idle
             conversation.updatedAt = Date()
-            try? modelContext.save()
+            saveContext(or: "Couldn't save the latest response.")
         }
     }
 
@@ -288,13 +294,21 @@ final class ChatViewModel {
 
         case "save_memory":
             guard let fact = args["fact"] as? String, !fact.isEmpty else { return "Missing fact" }
-            MemoryManager.saveMemory(fact, modelContext: modelContext)
-            return "Memory saved: \(fact)"
+            do {
+                try MemoryManager.saveMemory(fact, modelContext: modelContext)
+                return "Memory saved: \(fact)"
+            } catch {
+                return "Memory save failed: \(error.localizedDescription)"
+            }
 
         case "forget_memory":
             guard let query = args["query"] as? String, !query.isEmpty else { return "Missing query" }
-            let count = MemoryManager.forgetMemories(matching: query, modelContext: modelContext)
-            return count > 0 ? "Deleted \(count) memory(s) matching '\(query)'" : "No memories found matching '\(query)'"
+            do {
+                let count = try MemoryManager.forgetMemories(matching: query, modelContext: modelContext)
+                return count > 0 ? "Deleted \(count) memory(s) matching '\(query)'" : "No memories found matching '\(query)'"
+            } catch {
+                return "Forget memory failed: \(error.localizedDescription)"
+            }
 
         default:
             return "Unknown tool: \(call.name)"
@@ -352,7 +366,7 @@ final class ChatViewModel {
             do {
                 let stream = service.streamCompletion(
                     messages: messages,
-                    model: SettingsManager.defaultModelId(for: provider),
+                    model: SettingsManager.defaultModelIdForProvider(provider),
                     apiKey: apiKey
                 )
                 for try await token in stream {
@@ -363,12 +377,12 @@ final class ChatViewModel {
                 let cleaned = title.trimmingCharacters(in: .whitespacesAndNewlines)
                 if !cleaned.isEmpty {
                     conversation.title = cleaned
-                    try? modelContext.save()
+                    saveContext()
                 }
             } catch {
                 // Fall back to truncated first message
                 conversation.title = String(firstMessage.prefix(40))
-                try? modelContext.save()
+                saveContext()
             }
         }
     }
@@ -383,7 +397,7 @@ final class ChatViewModel {
         guard let lastMsg = sortedMessages.last, lastMsg.isError else { return }
         conversation.messages.removeAll { $0.id == lastMsg.id }
         modelContext.delete(lastMsg)
-        try? modelContext.save()
+        saveContext(or: "Couldn't retry because saving failed.")
         streamResponse()
     }
 
@@ -391,7 +405,7 @@ final class ChatViewModel {
         guard !isStreaming, message.messageRole == .assistant else { return }
         conversation.messages.removeAll { $0.id == message.id }
         modelContext.delete(message)
-        try? modelContext.save()
+        saveContext(or: "Couldn't regenerate because saving failed.")
         streamResponse()
     }
 
@@ -415,7 +429,15 @@ final class ChatViewModel {
         }
         conversation.messages.removeAll { $0.id == message.id }
         modelContext.delete(message)
-        try? modelContext.save()
+        saveContext(or: "Couldn't delete that message.")
+    }
+
+    private func saveContext(or fallbackMessage: String = "Couldn't save changes.") {
+        do {
+            try modelContext.save()
+        } catch {
+            uiErrorMessage = "\(fallbackMessage) \(error.localizedDescription)"
+        }
     }
 
     private func compressImage(_ data: Data) -> Data {
@@ -431,5 +453,90 @@ final class ChatViewModel {
             return resized.jpegData(compressionQuality: 0.7) ?? data
         }
         return uiImage.jpegData(compressionQuality: 0.7) ?? data
+    }
+
+    private static func checkProviderStatusNote(for provider: Provider) async -> String? {
+        guard let feedURL = provider.statusFeedURL else { return nil }
+        do {
+            let (data, _) = try await URLSession.shared.data(from: feedURL)
+            let delegate = RSSStatusDelegate()
+            let parser = XMLParser(data: data)
+            parser.delegate = delegate
+            parser.parse()
+
+            guard let latest = delegate.latestItem else { return nil }
+            let descLower = latest.description.lowercased()
+            let isResolved = descLower.contains("resolved") || descLower.contains("back to normal") || descLower.contains("operational")
+            let isOld = latest.pubDate.map { Date().timeIntervalSince($0) > 86_400 } ?? false
+
+            if !isResolved && !isOld {
+                if latest.link.isEmpty {
+                    return "\(provider.displayName) may be experiencing issues: \(latest.title)"
+                }
+                return "\(provider.displayName) may be experiencing issues: [\(latest.title)](\(latest.link))"
+            }
+        } catch { }
+        return nil
+    }
+}
+
+private final class RSSStatusDelegate: NSObject, XMLParserDelegate {
+    struct Item {
+        var title: String = ""
+        var link: String = ""
+        var description: String = ""
+        var pubDate: Date?
+    }
+
+    var latestItem: Item?
+    private var currentElement = ""
+    private var currentTitle = ""
+    private var currentLink = ""
+    private var currentDescription = ""
+    private var currentPubDate = ""
+    private var insideItem = false
+    private var foundFirst = false
+    
+    private static let dateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "EEE, dd MMM yyyy HH:mm:ss Z"
+        return f
+    }()
+    
+    func parser(_ parser: XMLParser, didStartElement elementName: String, namespaceURI: String?, qualifiedName: String?, attributes: [String: String] = [:]) {
+        currentElement = elementName
+        if elementName == "item" && !foundFirst {
+            insideItem = true
+            currentTitle = ""
+            currentLink = ""
+            currentDescription = ""
+            currentPubDate = ""
+        }
+    }
+    
+    func parser(_ parser: XMLParser, foundCharacters string: String) {
+        guard insideItem else { return }
+        switch currentElement {
+        case "title": currentTitle += string
+        case "link": currentLink += string
+        case "description": currentDescription += string
+        case "pubDate": currentPubDate += string
+        default: break
+        }
+    }
+    
+    func parser(_ parser: XMLParser, didEndElement elementName: String, namespaceURI: String?, qualifiedName: String?) {
+        if elementName == "item" && insideItem {
+            insideItem = false
+            foundFirst = true
+            latestItem = Item(
+                title: currentTitle.trimmingCharacters(in: .whitespacesAndNewlines),
+                link: currentLink.trimmingCharacters(in: .whitespacesAndNewlines),
+                description: currentDescription.trimmingCharacters(in: .whitespacesAndNewlines),
+                pubDate: Self.dateFormatter.date(from: currentPubDate.trimmingCharacters(in: .whitespacesAndNewlines))
+            )
+            parser.abortParsing()
+        }
     }
 }

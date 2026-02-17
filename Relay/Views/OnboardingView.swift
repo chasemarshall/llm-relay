@@ -90,7 +90,7 @@ struct OnboardingView: View {
                 .font(.system(size: 32, weight: .bold))
 
             VStack(alignment: .leading, spacing: 24) {
-                benefitRow(icon: "lock.shield", title: "Private by design", description: "Your API keys stay on your device. No accounts, no tracking.")
+                benefitRow(icon: "lock.shield", title: "Private by design", description: "Your API keys are stored in iOS Keychain on your device. No accounts, no tracking.")
                 benefitRow(icon: "arrow.triangle.branch", title: "Any provider, one app", description: "OpenRouter, OpenAI, or Anthropic — you choose.")
                 benefitRow(icon: "sparkles", title: "Native & lightweight", description: "Built for iOS. No bloat, just conversation.")
             }

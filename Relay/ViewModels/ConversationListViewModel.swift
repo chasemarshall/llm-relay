@@ -18,8 +18,8 @@ final class ConversationListViewModel {
         return convo
     }
 
-    func deleteConversation(_ conversation: Conversation, modelContext: ModelContext) {
+    func deleteConversation(_ conversation: Conversation, modelContext: ModelContext) throws {
         modelContext.delete(conversation)
-        try? modelContext.save()
+        try modelContext.save()
     }
 }

@@ -14,7 +14,6 @@ struct ChatView: View {
     @State private var viewModel: ChatViewModel
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var showPhotoPicker = false
-    @State private var showModelPicker = false
     @State private var showScrollToBottom = false
 
     // Cache the UIImage so we're not decoding Data on every frame
@@ -54,7 +53,7 @@ struct ChatView: View {
                 let distanceFromBottom = geometry.contentSize.height - geometry.contentOffset.y - geometry.containerSize.height
                 return distanceFromBottom > 200
             } action: { _, isScrolledUp in
-                withAnimation(.easeInOut(duration: 0.2)) {
+                withAnimation(.easeInOut(duration: AppTheme.Motion.standard)) {
                     showScrollToBottom = isScrolledUp
                 }
             }
@@ -66,21 +65,22 @@ struct ChatView: View {
                 scrollToBottom(proxy: proxy)
             }
             .onChange(of: viewModel.streamingText) {
-                scrollToBottom(proxy: proxy)
+                scrollToBottomInstant(proxy: proxy)
             }
-            .overlay(alignment: .bottom) {
+            .overlay(alignment: .bottomTrailing) {
                 if showScrollToBottom {
                     Button {
                         scrollToBottom(proxy: proxy)
                     } label: {
                         Image(systemName: "chevron.down")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(.primary)
-                            .frame(width: 36, height: 36)
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 24, height: 24)
                     }
                     .buttonStyle(.glass)
                     .clipShape(Circle())
-                    .padding(.bottom, 80)
+                    .padding(.trailing, 16)
+                    .padding(.bottom, 8)
                     .transition(.scale.combined(with: .opacity))
                 }
             }
@@ -90,6 +90,19 @@ struct ChatView: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { toolbarContent }
+        .alert(
+            "Error",
+            isPresented: Binding(
+                get: { viewModel.uiErrorMessage != nil },
+                set: { if !$0 { viewModel.uiErrorMessage = nil } }
+            )
+        ) {
+            Button("OK", role: .cancel) {
+                viewModel.uiErrorMessage = nil
+            }
+        } message: {
+            Text(viewModel.uiErrorMessage ?? "Something went wrong.")
+        }
     }
 
     // MARK: - Toolbar
@@ -109,138 +122,131 @@ struct ChatView: View {
     }
 
     private var modelPicker: some View {
-        Button {
-            showModelPicker.toggle()
+        Menu {
+            if !sortedAgents.isEmpty {
+                Menu("Agents") {
+                    ForEach(sortedAgents) { agent in
+                        Button {
+                            selectModel(agent.modelId, systemPrompt: agent.systemPrompt)
+                        } label: {
+                            menuRowLabel(
+                                shortLabel(agent.name),
+                                icon: agent.iconName ?? "person.circle",
+                                isSelected: conversation.modelId == agent.modelId
+                            )
+                        }
+                    }
+                }
+
+                if !primaryProviderGroups.isEmpty || !overflowProviderGroups.isEmpty {
+                    Divider()
+                }
+            }
+
+            ForEach(primaryProviderGroups) { group in
+                providerGroupMenu(group)
+            }
+
+            if !overflowProviderGroups.isEmpty {
+                Menu("More...") {
+                    ForEach(overflowProviderGroups) { group in
+                        providerGroupMenu(group)
+                    }
+                }
+            }
         } label: {
-            HStack(spacing: 6) {
-                Text(modelManager.modelName(for: conversation.modelId))
+            HStack(spacing: AppTheme.Spacing.xSmall) {
+                Text(shortLabel(modelManager.modelName(for: conversation.modelId)))
                     .font(.subheadline.weight(.medium))
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 140)
                 Image(systemName: "chevron.up.chevron.down")
                     .font(.system(size: 10, weight: .semibold))
             }
             .foregroundStyle(.primary)
         }
         .buttonStyle(.glass)
-        .popover(isPresented: $showModelPicker) {
-            modelPickerContent
-                .presentationCompactAdaptation(.popover)
+    }
+
+    private var sortedAgents: [Agent] {
+        agents.sorted {
+            $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
         }
     }
 
-    private var modelPickerContent: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 2) {
-                if !agents.isEmpty {
-                    DisclosureGroup {
-                        ForEach(agents) { agent in
-                            modelRow(
-                                name: agent.name,
-                                isSelected: conversation.modelId == agent.modelId
-                            ) {
-                                conversation.modelId = agent.modelId
-                                conversation.systemPrompt = agent.systemPrompt
-                                SettingsManager.sessionModelId = agent.modelId
-                                if conversation.modelContext != nil {
-                                    try? modelContext.save()
-                                }
-                                showModelPicker = false
-                            }
-                        }
-                    } label: {
-                        providerLabel("Agents", icon: "person.2.fill")
-                    }
-                    .tint(.secondary)
-                    .padding(.horizontal, 12)
-                }
+    private var preferredProviderKeys: [String] {
+        ["anthropic", "openai", "google", "x-ai", "meta-llama"]
+    }
 
-                ForEach(modelManager.groupedModels) { group in
-                    let containsSelected = group.models.contains { $0.id == conversation.modelId }
+    private var primaryProviderGroups: [ModelManager.ModelGroup] {
+        preferredProviderKeys.compactMap { preferredKey in
+            modelManager.groupedModels.first { $0.provider == preferredKey }
+        }
+    }
 
-                    DisclosureGroup {
-                        ForEach(group.models) { model in
-                            modelRow(
-                                name: model.name,
-                                isSelected: model.id == conversation.modelId
-                            ) {
-                                conversation.modelId = model.id
-                                SettingsManager.sessionModelId = model.id
-                                if conversation.modelContext != nil {
-                                    try? modelContext.save()
-                                }
-                                showModelPicker = false
-                            }
-                        }
-                    } label: {
-                        providerLabel(
-                            group.displayName,
-                            icon: providerIcon(for: group.provider),
-                            isActive: containsSelected
-                        )
-                    }
-                    .tint(.secondary)
-                    .padding(.horizontal, 12)
+    private var overflowProviderGroups: [ModelManager.ModelGroup] {
+        modelManager.groupedModels.filter { !preferredProviderKeys.contains($0.provider) }
+    }
+
+    private func providerGroupMenu(_ group: ModelManager.ModelGroup) -> some View {
+        Menu(group.displayName) {
+            ForEach(group.models) { model in
+                Button {
+                    selectModel(model.id)
+                } label: {
+                    menuRowLabel(
+                        shortLabel(model.name),
+                        isSelected: conversation.modelId == model.id
+                    )
                 }
             }
-            .padding(.vertical, 8)
         }
-        .frame(width: 280)
-        .frame(maxHeight: 420)
     }
 
-    private func providerLabel(_ title: String, icon: String, isActive: Bool = false) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.body)
-                .foregroundStyle(isActive ? Color.accentColor : .secondary)
-                .frame(width: 22)
+    private func menuRowLabel(_ title: String, icon: String? = nil, isSelected: Bool = false) -> some View {
+        HStack(spacing: 10) {
+            if let icon {
+                Image(systemName: icon)
+                    .foregroundStyle(.secondary)
+            }
             Text(title)
-                .font(.body.weight(.medium))
-                .foregroundStyle(isActive ? Color.accentColor : .primary)
-            if isActive {
-                Circle()
-                    .fill(Color.accentColor)
-                    .frame(width: 6, height: 6)
+            if isSelected {
+                Image(systemName: "checkmark")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Color.accentColor)
             }
         }
-        .padding(.vertical, 6)
     }
 
-    private func modelRow(name: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack {
-                Text(name)
-                    .font(.subheadline)
-                Spacer()
-                if isSelected {
-                    Image(systemName: "checkmark")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(Color.accentColor)
-                }
+    private func selectModel(_ modelId: String, systemPrompt: String? = nil) {
+        conversation.modelId = modelId
+        if let systemPrompt {
+            conversation.systemPrompt = systemPrompt
+        }
+        SettingsManager.sessionModelId = modelId
+        if conversation.modelContext != nil {
+            do {
+                try modelContext.save()
+            } catch {
+                viewModel.uiErrorMessage = "Couldn't save the selected model. \(error.localizedDescription)"
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
-            .background(
-                isSelected
-                    ? Color.accentColor.opacity(0.1)
-                    : Color.clear,
-                in: RoundedRectangle(cornerRadius: 22, style: .continuous)
-            )
         }
-        .buttonStyle(.plain)
-        .foregroundStyle(isSelected ? Color.accentColor : .primary)
     }
 
-    private func providerIcon(for provider: String) -> String {
-        switch provider {
-        case "anthropic": return "brain"
-        case "openai": return "sparkles"
-        case "google": return "globe"
-        case "meta-llama": return "flame"
-        case "mistralai": return "wind"
-        case "deepseek": return "water.waves"
-        case "x-ai": return "xmark.circle"
-        default: return "cpu"
+    private func shortLabel(_ text: String, maxLength: Int = 34) -> String {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let candidate: String
+        if let colon = trimmed.lastIndex(of: ":"), colon < trimmed.index(before: trimmed.endIndex) {
+            candidate = String(trimmed[trimmed.index(after: colon)...]).trimmingCharacters(in: .whitespaces)
+        } else if let slash = trimmed.lastIndex(of: "/"), slash < trimmed.index(before: trimmed.endIndex) {
+            candidate = String(trimmed[trimmed.index(after: slash)...]).trimmingCharacters(in: .whitespaces)
+        } else {
+            candidate = trimmed
         }
+
+        guard candidate.count > maxLength else { return candidate }
+        return String(candidate.prefix(maxLength - 1)) + "…"
     }
 
     // MARK: - Input bar
@@ -259,6 +265,13 @@ struct ChatView: View {
         .padding(.horizontal, 12)
         .padding(.bottom, 8)
         .padding(.top, 12)
+        .background(
+            LinearGradient(
+                colors: [Color.clear, AppTheme.Colors.surface],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        )
         .onChange(of: selectedPhotoItem) { _, newItem in
             loadPhoto(from: newItem)
         }
@@ -279,16 +292,20 @@ struct ChatView: View {
                         Text("Search")
                             .font(.caption2.weight(.medium))
                     }
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.accentColor)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
                 }
                 .buttonStyle(.plain)
                 .glassEffect(.regular.interactive(), in: .capsule)
+                .overlay {
+                    Capsule()
+                        .stroke(Color.accentColor.opacity(0.25), lineWidth: AppTheme.Border.thin)
+                }
 
                 Spacer()
             }
-            .padding(.leading, 6)
+            .padding(.leading, AppTheme.Spacing.xSmall)
             .transition(.opacity.combined(with: .scale(scale: 0.9)))
         }
     }
@@ -307,7 +324,7 @@ struct ChatView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
 
                     Button {
-                        withAnimation(.snappy(duration: 0.2)) {
+                        withAnimation(.snappy(duration: AppTheme.Motion.standard)) {
                             viewModel.selectedImageData = nil
                             thumbnailImage = nil
                         }
@@ -333,13 +350,17 @@ struct ChatView: View {
             textField
             trailingButton
         }
-        .padding(.leading, 6)
-        .padding(.trailing, 6)
-        .padding(.vertical, 6)
+        .padding(.leading, AppTheme.Spacing.xSmall)
+        .padding(.trailing, AppTheme.Spacing.xSmall)
+        .padding(.vertical, AppTheme.Spacing.xSmall)
         .glassEffect(
             .regular.interactive(),
-            in: RoundedRectangle(cornerRadius: 22, style: .continuous)
+            in: RoundedRectangle(cornerRadius: AppTheme.Radius.bubble, style: .continuous)
         )
+        .overlay {
+            RoundedRectangle(cornerRadius: AppTheme.Radius.bubble, style: .continuous)
+                .stroke(AppTheme.Colors.subtleBorder.opacity(0.3), lineWidth: AppTheme.Border.thin)
+        }
     }
 
     private var attachmentMenu: some View {
@@ -395,7 +416,7 @@ struct ChatView: View {
                 }
             }
             .disabled(!hasContent)
-            .animation(.easeInOut(duration: 0.15), value: hasContent)
+            .animation(.easeInOut(duration: AppTheme.Motion.quick), value: hasContent)
             .transition(.blurReplace)
         }
     }
@@ -404,7 +425,14 @@ struct ChatView: View {
 
     private func scrollToBottom(proxy: ScrollViewProxy) {
         guard let lastMessage = viewModel.sortedMessages.last else { return }
-        withAnimation(.easeOut(duration: 0.3)) {
+        withAnimation(.easeOut(duration: AppTheme.Motion.smooth)) {
+            proxy.scrollTo(lastMessage.id, anchor: .bottom)
+        }
+    }
+
+    private func scrollToBottomInstant(proxy: ScrollViewProxy) {
+        guard let lastMessage = viewModel.sortedMessages.last else { return }
+        withAnimation(.linear(duration: 0.08)) {
             proxy.scrollTo(lastMessage.id, anchor: .bottom)
         }
     }
@@ -412,7 +440,11 @@ struct ChatView: View {
     private func cleanUpIfEmpty() {
         guard conversation.messages.isEmpty, conversation.modelContext != nil else { return }
         modelContext.delete(conversation)
-        try? modelContext.save()
+        do {
+            try modelContext.save()
+        } catch {
+            viewModel.uiErrorMessage = "Couldn't clean up empty chat. \(error.localizedDescription)"
+        }
     }
 
     private func loadPhoto(from item: PhotosPickerItem?) {

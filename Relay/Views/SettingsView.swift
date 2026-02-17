@@ -1,6 +1,18 @@
 import SwiftUI
 import SwiftData
 
+private enum ProviderStatus {
+    case operational, incident, unknown
+
+    var color: Color {
+        switch self {
+        case .operational: .green
+        case .incident: .red
+        case .unknown: .gray
+        }
+    }
+}
+
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -19,6 +31,9 @@ struct SettingsView: View {
     @State private var showClearChatsAlert = false
     @State private var hasChanges = false
     @State private var didLoad = false
+    @State private var errorMessage: String?
+    @State private var providerStatus: ProviderStatus = .unknown
+    @State private var searchProviderStatus: ProviderStatus = .unknown
 
     private var currentAiKey: Binding<String> {
         Binding(
@@ -49,7 +64,16 @@ struct SettingsView: View {
                 } header: {
                     Text("AI Provider")
                 } footer: {
-                    Text("Get your key at [\(aiProvider.keyPlaceholder)](https://\(aiProvider.keyPlaceholder))")
+                    HStack(spacing: 4) {
+                        if let statusURL = aiProvider.statusURL {
+                            Link(destination: statusURL) {
+                                Circle()
+                                    .fill(providerStatus.color)
+                                    .frame(width: 6, height: 6)
+                            }
+                        }
+                        Text("Get your key at [\(aiProvider.keyPlaceholder)](https://\(aiProvider.keyPlaceholder))")
+                    }
                 }
 
                 Section {
@@ -64,7 +88,16 @@ struct SettingsView: View {
                 } header: {
                     Text("Web Search")
                 } footer: {
-                    Text("Get your key at [\(searchProvider.keyPlaceholder)](https://\(searchProvider.keyPlaceholder))")
+                    HStack(spacing: 4) {
+                        if let statusURL = searchProvider.statusURL {
+                            Link(destination: statusURL) {
+                                Circle()
+                                    .fill(searchProviderStatus.color)
+                                    .frame(width: 6, height: 6)
+                            }
+                        }
+                        Text("Get your key at [\(searchProvider.keyPlaceholder)](https://\(searchProvider.keyPlaceholder))")
+                    }
                 }
 
                 Section {
@@ -121,7 +154,11 @@ struct SettingsView: View {
                         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                             Button(role: .destructive) {
                                 modelContext.delete(agent)
-                                try? modelContext.save()
+                                do {
+                                    try modelContext.save()
+                                } catch {
+                                    errorMessage = "Couldn't delete that agent. \(error.localizedDescription)"
+                                }
                             } label: {
                                 Image(systemName: "trash")
                             }
@@ -153,8 +190,12 @@ struct SettingsView: View {
                         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                             Button(role: .destructive) {
                                 modelContext.delete(memory)
-                                try? modelContext.save()
-                                hasChanges = true
+                                do {
+                                    try modelContext.save()
+                                    hasChanges = true
+                                } catch {
+                                    errorMessage = "Couldn't delete that memory. \(error.localizedDescription)"
+                                }
                             } label: {
                                 Image(systemName: "trash")
                             }
@@ -168,9 +209,13 @@ struct SettingsView: View {
                             guard !trimmed.isEmpty else { return }
                             let memory = Memory(content: trimmed)
                             modelContext.insert(memory)
-                            try? modelContext.save()
-                            newMemory = ""
-                            hasChanges = true
+                            do {
+                                try modelContext.save()
+                                newMemory = ""
+                                hasChanges = true
+                            } catch {
+                                errorMessage = "Couldn't save that memory. \(error.localizedDescription)"
+                            }
                         } label: {
                             Image(systemName: "plus.circle.fill")
                                 .foregroundColor(.accentColor)
@@ -192,6 +237,19 @@ struct SettingsView: View {
                 } header: {
                     Text("Data")
                 }
+            }
+            .alert(
+                "Error",
+                isPresented: Binding(
+                    get: { errorMessage != nil },
+                    set: { if !$0 { errorMessage = nil } }
+                )
+            ) {
+                Button("OK", role: .cancel) {
+                    errorMessage = nil
+                }
+            } message: {
+                Text(errorMessage ?? "Something went wrong.")
             }
             .scrollDismissesKeyboard(.interactively)
             .navigationTitle("Settings")
@@ -218,15 +276,21 @@ struct SettingsView: View {
             }
             .onAppear {
                 loadSettings()
+                checkProviderStatus()
+                checkSearchProviderStatus()
             }
             .onChange(of: aiProvider) {
                 if didLoad { hasChanges = true }
                 modelManager.loadModels(for: aiProvider)
-                defaultModelId = SettingsManager.defaultModelId(for: aiProvider)
+                defaultModelId = SettingsManager.defaultModelIdForProvider(aiProvider)
+                checkProviderStatus()
             }
             .onChange(of: aiKeys) { if didLoad { hasChanges = true } }
             .onChange(of: searchKeys) { if didLoad { hasChanges = true } }
-            .onChange(of: searchProvider) { if didLoad { hasChanges = true } }
+            .onChange(of: searchProvider) {
+                if didLoad { hasChanges = true }
+                checkSearchProviderStatus()
+            }
             .onChange(of: defaultModelId) { if didLoad { hasChanges = true } }
             .onChange(of: globalSystemPrompt) { if didLoad { hasChanges = true } }
             .sheet(isPresented: $showNewAgent) {
@@ -241,7 +305,9 @@ struct SettingsView: View {
                     do {
                         try modelContext.delete(model: Conversation.self)
                         try modelContext.save()
-                    } catch { }
+                    } catch {
+                        errorMessage = "Couldn't clear chats. \(error.localizedDescription)"
+                    }
                 }
             } message: {
                 Text("This will permanently delete all conversations and messages. This cannot be undone.")
@@ -295,5 +361,105 @@ struct SettingsView: View {
         SettingsManager.searchProvider = searchProvider
         SettingsManager.defaultModelId = defaultModelId
         SettingsManager.globalSystemPrompt = globalSystemPrompt.isEmpty ? nil : globalSystemPrompt
+    }
+
+    private func checkProviderStatus() {
+        guard let feedURL = aiProvider.statusFeedURL else {
+            providerStatus = .unknown
+            return
+        }
+        fetchStatus(from: feedURL) { providerStatus = $0 }
+    }
+
+    private func checkSearchProviderStatus() {
+        guard let feedURL = searchProvider.statusFeedURL else {
+            searchProviderStatus = .unknown
+            return
+        }
+        fetchStatus(from: feedURL) { searchProviderStatus = $0 }
+    }
+
+    private func fetchStatus(from url: URL, completion: @escaping (ProviderStatus) -> Void) {
+        Task {
+            do {
+                let (data, _) = try await URLSession.shared.data(from: url)
+                let delegate = RSSParserDelegate()
+                let parser = XMLParser(data: data)
+                parser.delegate = delegate
+                parser.parse()
+
+                let status: ProviderStatus
+                if let latest = delegate.items.first {
+                    let descLower = latest.description.lowercased()
+                    let isResolved = descLower.contains("resolved") || descLower.contains("back to normal") || descLower.contains("operational")
+                    let isOld = latest.pubDate.map { Date().timeIntervalSince($0) > 86_400 } ?? false
+                    if isResolved || isOld {
+                        status = .operational
+                    } else {
+                        status = .incident
+                    }
+                } else {
+                    status = .operational
+                }
+
+                await MainActor.run { completion(status) }
+            } catch {
+                await MainActor.run { completion(.unknown) }
+            }
+        }
+    }
+}
+
+private final class RSSParserDelegate: NSObject, XMLParserDelegate {
+    struct Item {
+        var title: String = ""
+        var description: String = ""
+        var pubDate: Date?
+    }
+
+    var items: [Item] = []
+    private var currentElement = ""
+    private var currentTitle = ""
+    private var currentDescription = ""
+    private var currentPubDate = ""
+    private var insideItem = false
+
+    private static let dateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "EEE, dd MMM yyyy HH:mm:ss Z"
+        return f
+    }()
+
+    func parser(_ parser: XMLParser, didStartElement elementName: String, namespaceURI: String?, qualifiedName: String?, attributes: [String: String] = [:]) {
+        currentElement = elementName
+        if elementName == "item" {
+            insideItem = true
+            currentTitle = ""
+            currentDescription = ""
+            currentPubDate = ""
+        }
+    }
+
+    func parser(_ parser: XMLParser, foundCharacters string: String) {
+        guard insideItem else { return }
+        switch currentElement {
+        case "title": currentTitle += string
+        case "description": currentDescription += string
+        case "pubDate": currentPubDate += string
+        default: break
+        }
+    }
+
+    func parser(_ parser: XMLParser, didEndElement elementName: String, namespaceURI: String?, qualifiedName: String?) {
+        if elementName == "item" {
+            insideItem = false
+            let item = Item(
+                title: currentTitle.trimmingCharacters(in: .whitespacesAndNewlines),
+                description: currentDescription.trimmingCharacters(in: .whitespacesAndNewlines),
+                pubDate: Self.dateFormatter.date(from: currentPubDate.trimmingCharacters(in: .whitespacesAndNewlines))
+            )
+            items.append(item)
+        }
     }
 }

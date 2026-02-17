@@ -11,6 +11,7 @@ struct AgentEditorView: View {
     @State private var systemPrompt: String
     @State private var selectedIcon: String?
     @State private var showIconPicker = false
+    @State private var errorMessage: String?
 
     let existingAgent: Agent?
     let onSave: (() -> Void)?
@@ -87,9 +88,13 @@ struct AgentEditorView: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button {
-                        save()
-                        onSave?()
-                        dismiss()
+                        do {
+                            try save()
+                            onSave?()
+                            dismiss()
+                        } catch {
+                            errorMessage = "Couldn't save this agent. \(error.localizedDescription)"
+                        }
                     } label: {
                         Image(systemName: "checkmark")
                             .fontWeight(.semibold)
@@ -101,10 +106,23 @@ struct AgentEditorView: View {
             .sheet(isPresented: $showIconPicker) {
                 SFSymbolPickerView(selectedIcon: $selectedIcon)
             }
+            .alert(
+                "Error",
+                isPresented: Binding(
+                    get: { errorMessage != nil },
+                    set: { if !$0 { errorMessage = nil } }
+                )
+            ) {
+                Button("OK", role: .cancel) {
+                    errorMessage = nil
+                }
+            } message: {
+                Text(errorMessage ?? "Something went wrong.")
+            }
         }
     }
 
-    private func save() {
+    private func save() throws {
         if let agent = existingAgent {
             agent.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
             agent.modelId = selectedModelId
@@ -119,6 +137,6 @@ struct AgentEditorView: View {
             )
             modelContext.insert(agent)
         }
-        try? modelContext.save()
+        try modelContext.save()
     }
 }

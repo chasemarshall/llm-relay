@@ -10,6 +10,8 @@ struct ConversationListView: View {
     @State private var modelManager = ModelManager.shared
     @State private var renamingConversation: Conversation?
     @State private var renameText: String = ""
+    @State private var listWidth: CGFloat = 0
+    @State private var errorMessage: String?
 
     var filteredConversations: [Conversation] {
         let list = viewModel.searchText.isEmpty ? conversations : conversations.filter {
@@ -28,7 +30,7 @@ struct ConversationListView: View {
                     Button {
                         navigationPath = [conversation]
                     } label: {
-                        HStack {
+                        HStack(spacing: AppTheme.Spacing.small) {
                             VStack(alignment: .leading, spacing: 4) {
                                 HStack(spacing: 4) {
                                     if conversation.isPinned {
@@ -37,16 +39,16 @@ struct ConversationListView: View {
                                             .foregroundStyle(.secondary)
                                     }
                                     Text(conversation.title)
-                                        .font(.body)
+                                        .font(.body.weight(.medium))
                                         .lineLimit(1)
                                 }
-                                HStack(spacing: 6) {
+                                HStack(spacing: AppTheme.Spacing.xSmall) {
                                     Text(modelManager.modelName(for: conversation.modelId))
                                     Text("·")
                                     Text(timeAgo(conversation.updatedAt))
                                 }
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(.secondary.opacity(0.9))
                                 .lineLimit(1)
                             }
                             Spacer()
@@ -54,6 +56,13 @@ struct ConversationListView: View {
                                 .font(.caption2.weight(.semibold))
                                 .foregroundStyle(.quaternary)
                         }
+                        .padding(.horizontal, AppTheme.Spacing.small)
+                        .padding(.vertical, 8)
+                        .background(
+                            conversation.isPinned ? AppTheme.Colors.pinnedTint : Color.clear,
+                            in: RoundedRectangle(cornerRadius: AppTheme.Radius.control, style: .continuous)
+                        )
+                        .animation(.easeInOut(duration: AppTheme.Motion.quick), value: conversation.isPinned)
                     }
                     .foregroundStyle(.primary)
                     .contextMenu {
@@ -65,30 +74,54 @@ struct ConversationListView: View {
                         }
                         Button {
                             conversation.isPinned.toggle()
-                            try? modelContext.save()
+                            do {
+                                try modelContext.save()
+                            } catch {
+                                conversation.isPinned.toggle()
+                                errorMessage = "Couldn't update pin state. \(error.localizedDescription)"
+                            }
                         } label: {
                             Label(conversation.isPinned ? "Unpin" : "Pin", systemImage: conversation.isPinned ? "pin.slash" : "pin")
                         }
                         Divider()
                         Button(role: .destructive) {
-                            if navigationPath.first?.id == conversation.id {
-                                navigationPath = []
-                            }
-                            viewModel.deleteConversation(conversation, modelContext: modelContext)
+                            deleteConversation(conversation)
                         } label: {
                             Label("Delete", systemImage: "trash")
                         }
                     }
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                         Button(role: .destructive) {
-                            if navigationPath.first?.id == conversation.id {
-                                navigationPath = []
-                            }
-                            viewModel.deleteConversation(conversation, modelContext: modelContext)
+                            deleteConversation(conversation)
                         } label: {
                             Image(systemName: "trash")
                         }
                     }
+                }
+            }
+            .alert(
+                "Error",
+                isPresented: Binding(
+                    get: { errorMessage != nil },
+                    set: { if !$0 { errorMessage = nil } }
+                )
+            ) {
+                Button("OK", role: .cancel) {
+                    errorMessage = nil
+                }
+            } message: {
+                Text(errorMessage ?? "Something went wrong.")
+            }
+            .listStyle(.insetGrouped)
+            .background {
+                GeometryReader { proxy in
+                    Color.clear
+                        .onAppear {
+                            listWidth = proxy.size.width
+                        }
+                        .onChange(of: proxy.size.width) { _, width in
+                            listWidth = width
+                        }
                 }
             }
             .searchable(text: $viewModel.searchText, prompt: "Search chats")
@@ -96,8 +129,8 @@ struct ConversationListView: View {
                 DragGesture(minimumDistance: 60)
                     .onEnded { value in
                         // Only trigger if swipe started from the right edge of the screen
-                        let screenWidth = UIScreen.main.bounds.width
-                        if value.startLocation.x > screenWidth * 0.7
+                        let width = listWidth > 0 ? listWidth : 390
+                        if value.startLocation.x > width * 0.7
                             && value.translation.width < -60
                             && abs(value.translation.height) < 50 {
                             newChat()
@@ -120,11 +153,15 @@ struct ConversationListView: View {
                         if !agents.isEmpty {
                             Divider()
 
-                            ForEach(agents) { agent in
+                            let sortedAgents = agents.sorted {
+                                $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+                            }
+
+                            ForEach(sortedAgents) { agent in
                                 Button {
                                     newChat(agent: agent)
                                 } label: {
-                                    Label(agent.name, systemImage: agent.iconName ?? "person.circle")
+                                    Text(agent.name)
                                 }
                             }
                         }
@@ -153,7 +190,11 @@ struct ConversationListView: View {
                     let trimmed = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
                     if !trimmed.isEmpty, let convo = renamingConversation {
                         convo.title = trimmed
-                        try? modelContext.save()
+                        do {
+                            try modelContext.save()
+                        } catch {
+                            errorMessage = "Couldn't rename that chat. \(error.localizedDescription)"
+                        }
                     }
                     renamingConversation = nil
                 }
@@ -190,6 +231,17 @@ struct ConversationListView: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                 navigationPath = [convo]
             }
+        }
+    }
+
+    private func deleteConversation(_ conversation: Conversation) {
+        if navigationPath.first?.id == conversation.id {
+            navigationPath = []
+        }
+        do {
+            try viewModel.deleteConversation(conversation, modelContext: modelContext)
+        } catch {
+            errorMessage = "Couldn't delete that chat. \(error.localizedDescription)"
         }
     }
 }

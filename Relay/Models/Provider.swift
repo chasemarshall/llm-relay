@@ -31,6 +31,22 @@ enum Provider: String, Codable, CaseIterable, Identifiable {
         }
     }
 
+    var statusURL: URL? {
+        switch self {
+        case .openRouter: URL(string: "https://status.openrouter.ai")
+        case .openAI: URL(string: "https://status.openai.com")
+        case .anthropic: URL(string: "https://status.claude.com")
+        }
+    }
+
+    var statusFeedURL: URL? {
+        switch self {
+        case .openRouter: URL(string: "https://status.openrouter.ai/incidents.rss")
+        case .openAI: URL(string: "https://status.openai.com/feed.rss")
+        case .anthropic: URL(string: "https://status.claude.com/history.rss")
+        }
+    }
+
     var usesOpenAIFormat: Bool {
         switch self {
         case .openRouter, .openAI: true
