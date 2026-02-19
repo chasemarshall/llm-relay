@@ -84,12 +84,33 @@ struct ChatView: View {
                     .transition(.scale.combined(with: .opacity))
                 }
             }
-            .safeAreaInset(edge: .bottom) {
+            .safeAreaInset(edge: .bottom, spacing: 0) {
                 inputBar
             }
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { toolbarContent }
+        .confirmationDialog(
+            "Memory Request",
+            isPresented: Binding(
+                get: { viewModel.pendingMemoryApproval != nil },
+                set: {
+                    if !$0 {
+                        viewModel.respondToMemoryApproval(false)
+                    }
+                }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Allow") {
+                viewModel.respondToMemoryApproval(true)
+            }
+            Button("Don't Allow", role: .cancel) {
+                viewModel.respondToMemoryApproval(false)
+            }
+        } message: {
+            Text(viewModel.pendingMemoryApproval?.action.message ?? "")
+        }
         .alert(
             "Error",
             isPresented: Binding(
@@ -265,13 +286,6 @@ struct ChatView: View {
         .padding(.horizontal, 12)
         .padding(.bottom, 8)
         .padding(.top, 12)
-        .background(
-            LinearGradient(
-                colors: [Color.clear, AppTheme.Colors.surface],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        )
         .onChange(of: selectedPhotoItem) { _, newItem in
             loadPhoto(from: newItem)
         }
@@ -298,10 +312,6 @@ struct ChatView: View {
                 }
                 .buttonStyle(.plain)
                 .glassEffect(.regular.interactive(), in: .capsule)
-                .overlay {
-                    Capsule()
-                        .stroke(Color.accentColor.opacity(0.25), lineWidth: AppTheme.Border.thin)
-                }
 
                 Spacer()
             }
@@ -345,21 +355,20 @@ struct ChatView: View {
     // MARK: - Input row
 
     private var inputRow: some View {
-        HStack(spacing: 8) {
+        HStack(alignment: .bottom, spacing: 8) {
             attachmentMenu
-            textField
-            trailingButton
-        }
-        .padding(.leading, AppTheme.Spacing.xSmall)
-        .padding(.trailing, AppTheme.Spacing.xSmall)
-        .padding(.vertical, AppTheme.Spacing.xSmall)
-        .glassEffect(
-            .regular.interactive(),
-            in: RoundedRectangle(cornerRadius: AppTheme.Radius.bubble, style: .continuous)
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: AppTheme.Radius.bubble, style: .continuous)
-                .stroke(AppTheme.Colors.subtleBorder.opacity(0.3), lineWidth: AppTheme.Border.thin)
+
+            HStack(spacing: 8) {
+                textField
+                trailingButton
+            }
+            .padding(.leading, 12)
+            .padding(.trailing, AppTheme.Spacing.xSmall)
+            .padding(.vertical, AppTheme.Spacing.xSmall)
+            .glassEffect(
+                .regular.interactive(),
+                in: RoundedRectangle(cornerRadius: AppTheme.Radius.bubble, style: .continuous)
+            )
         }
     }
 
@@ -377,8 +386,11 @@ struct ChatView: View {
             Image(systemName: "plus")
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(Color.accentColor)
-                .frame(width: 30, height: 30)
+                .frame(width: 42, height: 42)
+                .glassEffect(.regular.interactive(), in: .circle)
+                .contentShape(Circle())
         }
+        .menuStyle(.borderlessButton)
         .photosPicker(isPresented: $showPhotoPicker, selection: $selectedPhotoItem, matching: .images)
     }
 

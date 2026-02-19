@@ -11,6 +11,23 @@ enum StreamingPhase: Equatable {
 
 @MainActor @Observable
 final class ChatViewModel {
+    struct PendingMemoryApproval: Identifiable {
+        enum Action {
+            case save(String)
+            case forget(String)
+
+            var message: String {
+                switch self {
+                case .save(let fact): "Allow Relay to save this memory?\n\n\"\(fact)\""
+                case .forget(let query): "Allow Relay to forget memories matching?\n\n\"\(query)\""
+                }
+            }
+        }
+
+        let id = UUID()
+        let action: Action
+    }
+
     var conversation: Conversation
     var inputText: String = ""
     var isStreaming: Bool = false
@@ -18,6 +35,7 @@ final class ChatViewModel {
     var isWaitingForToken: Bool = false
     var searchEnabled: Bool = false
     var uiErrorMessage: String?
+    var pendingMemoryApproval: PendingMemoryApproval?
     var selectedImageData: Data?
     private var streamTask: Task<Void, Never>?
     private var modelContext: ModelContext
@@ -25,6 +43,7 @@ final class ChatViewModel {
     private var thinkingBuffer: String = ""
     private var lastFlush: Date = .distantPast
     private var waitingTimer: Task<Void, Never>?
+    private var memoryApprovalContinuation: CheckedContinuation<Bool, Never>?
 
     private static let maxToolIterations = 3
 
@@ -124,22 +143,28 @@ final class ChatViewModel {
         let shouldSearch = searchEnabled
         isStreaming = true
         streamingPhase = .thinking
+        cancelPendingMemoryApproval()
 
         streamTask = Task {
             do {
+                let memoryPolicy = SettingsManager.memoryWritePolicy
                 let baseChatMessages = buildChatMessages(excluding: assistantMessage)
-                var tools: [ToolDefinition] = [Self.saveMemoryTool, Self.forgetMemoryTool]
-                let searchToolEnabled = shouldSearch && KeychainManager.searchApiKey() != nil
-                if searchToolEnabled {
-                    tools.append(Self.searchTool)
+                var tools: [ToolDefinition] = []
+                if memoryPolicy != .off {
+                    tools = [Self.saveMemoryTool, Self.forgetMemoryTool]
                 }
+                let hasSearchKey = KeychainManager.searchApiKey() != nil
 
                 // Tool-use loop: stream → detect tool calls → execute → re-stream
                 var loopMessages = baseChatMessages
                 var iteration = 0
 
                 while iteration < Self.maxToolIterations {
-                    let forceToolName: String? = (searchToolEnabled && iteration == 0) ? "web_search" : nil
+                    var loopTools = tools
+                    if hasSearchKey {
+                        loopTools.append(Self.searchTool)
+                    }
+                    let forceToolName: String? = (shouldSearch && hasSearchKey && iteration == 0) ? "web_search" : nil
 
                     streamingPhase = .thinking
                     tokenBuffer = ""
@@ -157,7 +182,7 @@ final class ChatViewModel {
                         messages: loopMessages,
                         model: modelId,
                         apiKey: apiKey,
-                        tools: tools,
+                        tools: loopTools,
                         forceToolName: forceToolName
                     )
 
@@ -258,6 +283,7 @@ final class ChatViewModel {
 
             isStreaming = false
             streamingPhase = .idle
+            cancelPendingMemoryApproval()
             conversation.updatedAt = Date()
             saveContext(or: "Couldn't save the latest response.")
         }
@@ -293,19 +319,45 @@ final class ChatViewModel {
             }
 
         case "save_memory":
-            guard let fact = args["fact"] as? String, !fact.isEmpty else { return "Missing fact" }
+            guard let fact = args["fact"] as? String else { return "Missing fact" }
+            let trimmedFact = fact.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmedFact.isEmpty else { return "Missing fact" }
+
+            switch SettingsManager.memoryWritePolicy {
+            case .off:
+                return "Memory writes are disabled in Settings."
+            case .ask:
+                let approved = await requestMemoryApproval(.save(trimmedFact))
+                guard approved else { return "Memory save canceled by user." }
+            case .auto:
+                break
+            }
+
             do {
-                try MemoryManager.saveMemory(fact, modelContext: modelContext)
-                return "Memory saved: \(fact)"
+                try MemoryManager.saveMemory(trimmedFact, modelContext: modelContext)
+                return "Memory saved: \(trimmedFact)"
             } catch {
                 return "Memory save failed: \(error.localizedDescription)"
             }
 
         case "forget_memory":
-            guard let query = args["query"] as? String, !query.isEmpty else { return "Missing query" }
+            guard let query = args["query"] as? String else { return "Missing query" }
+            let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmedQuery.isEmpty else { return "Missing query" }
+
+            switch SettingsManager.memoryWritePolicy {
+            case .off:
+                return "Memory writes are disabled in Settings."
+            case .ask:
+                let approved = await requestMemoryApproval(.forget(trimmedQuery))
+                guard approved else { return "Forget request canceled by user." }
+            case .auto:
+                break
+            }
+
             do {
-                let count = try MemoryManager.forgetMemories(matching: query, modelContext: modelContext)
-                return count > 0 ? "Deleted \(count) memory(s) matching '\(query)'" : "No memories found matching '\(query)'"
+                let count = try MemoryManager.forgetMemories(matching: trimmedQuery, modelContext: modelContext)
+                return count > 0 ? "Deleted \(count) memory(s) matching '\(trimmedQuery)'" : "No memories found matching '\(trimmedQuery)'"
             } catch {
                 return "Forget memory failed: \(error.localizedDescription)"
             }
@@ -389,8 +441,16 @@ final class ChatViewModel {
 
     func stopStreaming() {
         streamTask?.cancel()
+        cancelPendingMemoryApproval()
         isStreaming = false
         streamingPhase = .idle
+    }
+
+    func respondToMemoryApproval(_ approved: Bool) {
+        pendingMemoryApproval = nil
+        guard let continuation = memoryApprovalContinuation else { return }
+        memoryApprovalContinuation = nil
+        continuation.resume(returning: approved)
     }
 
     func retryLastMessage() {
@@ -438,6 +498,21 @@ final class ChatViewModel {
         } catch {
             uiErrorMessage = "\(fallbackMessage) \(error.localizedDescription)"
         }
+    }
+
+    private func requestMemoryApproval(_ action: PendingMemoryApproval.Action) async -> Bool {
+        cancelPendingMemoryApproval()
+        pendingMemoryApproval = PendingMemoryApproval(action: action)
+        return await withCheckedContinuation { continuation in
+            memoryApprovalContinuation = continuation
+        }
+    }
+
+    private func cancelPendingMemoryApproval() {
+        pendingMemoryApproval = nil
+        guard let continuation = memoryApprovalContinuation else { return }
+        memoryApprovalContinuation = nil
+        continuation.resume(returning: false)
     }
 
     private func compressImage(_ data: Data) -> Data {

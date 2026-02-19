@@ -14,16 +14,20 @@ enum SearchService {
         guard let apiKey = KeychainManager.searchApiKey() else {
             throw SearchError.noApiKey(provider.displayName)
         }
+        let resultLimit = max(1, min(SettingsManager.searchResultLimit, 20))
         switch provider {
-        case .tavily: return try await tavilySearch(query: query, apiKey: apiKey)
-        case .firecrawl: return try await firecrawlSearch(query: query, apiKey: apiKey)
+        case .tavily: return try await tavilySearch(query: query, apiKey: apiKey, limit: resultLimit)
+        case .firecrawl: return try await firecrawlSearch(query: query, apiKey: apiKey, limit: resultLimit)
         }
     }
 
     // MARK: - Tavily
 
-    private static func tavilySearch(query: String, apiKey: String) async throws -> [SearchResult] {
-        var request = URLRequest(url: URL(string: "https://api.tavily.com/search")!)
+    private static func tavilySearch(query: String, apiKey: String, limit: Int) async throws -> [SearchResult] {
+        guard let endpoint = URL(string: "https://api.tavily.com/search") else {
+            throw SearchError.networkError("Invalid Tavily endpoint")
+        }
+        var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
@@ -31,7 +35,7 @@ enum SearchService {
 
         let body: [String: Any] = [
             "query": query,
-            "max_results": 5,
+            "max_results": limit,
             "include_answer": false
         ]
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
@@ -61,8 +65,11 @@ enum SearchService {
 
     // MARK: - Firecrawl
 
-    private static func firecrawlSearch(query: String, apiKey: String) async throws -> [SearchResult] {
-        var request = URLRequest(url: URL(string: "https://api.firecrawl.dev/v1/search")!)
+    private static func firecrawlSearch(query: String, apiKey: String, limit: Int) async throws -> [SearchResult] {
+        guard let endpoint = URL(string: "https://api.firecrawl.dev/v1/search") else {
+            throw SearchError.networkError("Invalid Firecrawl endpoint")
+        }
+        var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
@@ -70,7 +77,7 @@ enum SearchService {
 
         let body: [String: Any] = [
             "query": query,
-            "limit": 5
+            "limit": limit
         ]
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 

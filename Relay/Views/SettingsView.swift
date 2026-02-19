@@ -22,6 +22,8 @@ struct SettingsView: View {
     @State private var aiKeys: [Provider: String] = [:]
     @State private var searchKeys: [SearchProvider: String] = [:]
     @State private var searchProvider: SearchProvider = .tavily
+    @State private var searchResultLimit: Int = 5
+    @State private var memoryWritePolicy: MemoryWritePolicy = .ask
     @State private var newMemory: String = ""
     @State private var defaultModelId: String = ""
     @State private var globalSystemPrompt: String = ""
@@ -101,6 +103,22 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    Stepper(value: $searchResultLimit, in: 1...20) {
+                        Text("Sources per search: \(searchResultLimit)")
+                    }
+
+                    Picker("Memory writes", selection: $memoryWritePolicy) {
+                        ForEach(MemoryWritePolicy.allCases, id: \.self) { policy in
+                            Text(policy.displayName).tag(policy)
+                        }
+                    }
+                } header: {
+                    Text("Assistant Tools")
+                } footer: {
+                    Text("Use Ask to approve each save/forget memory request. Source limit applies to each web search request.")
+                }
+
+                Section {
                     Picker("Model", selection: $defaultModelId) {
                         if !modelManager.models.contains(where: { $0.id == defaultModelId }) {
                             Text(defaultModelId).tag(defaultModelId)
@@ -115,6 +133,11 @@ struct SettingsView: View {
                     }
                 } header: {
                     Text("Default Model")
+                } footer: {
+                    if let fetchError = modelManager.lastFetchError {
+                        Text(fetchError)
+                            .foregroundStyle(.orange)
+                    }
                 }
 
                 Section {
@@ -278,12 +301,18 @@ struct SettingsView: View {
                 loadSettings()
                 checkProviderStatus()
                 checkSearchProviderStatus()
+                Task {
+                    await modelManager.fetchModels(for: aiProvider)
+                }
             }
             .onChange(of: aiProvider) {
                 if didLoad { hasChanges = true }
                 modelManager.loadModels(for: aiProvider)
                 defaultModelId = SettingsManager.defaultModelIdForProvider(aiProvider)
                 checkProviderStatus()
+                Task {
+                    await modelManager.fetchModels(for: aiProvider)
+                }
             }
             .onChange(of: aiKeys) { if didLoad { hasChanges = true } }
             .onChange(of: searchKeys) { if didLoad { hasChanges = true } }
@@ -293,6 +322,8 @@ struct SettingsView: View {
             }
             .onChange(of: defaultModelId) { if didLoad { hasChanges = true } }
             .onChange(of: globalSystemPrompt) { if didLoad { hasChanges = true } }
+            .onChange(of: searchResultLimit) { if didLoad { hasChanges = true } }
+            .onChange(of: memoryWritePolicy) { if didLoad { hasChanges = true } }
             .sheet(isPresented: $showNewAgent) {
                 AgentEditorView()
             }
@@ -318,6 +349,8 @@ struct SettingsView: View {
     private func loadSettings() {
         aiProvider = SettingsManager.aiProvider
         searchProvider = SettingsManager.searchProvider
+        searchResultLimit = SettingsManager.searchResultLimit
+        memoryWritePolicy = SettingsManager.memoryWritePolicy
         defaultModelId = SettingsManager.defaultModelId
         globalSystemPrompt = SettingsManager.globalSystemPrompt ?? ""
 
@@ -359,6 +392,8 @@ struct SettingsView: View {
 
         SettingsManager.aiProvider = aiProvider
         SettingsManager.searchProvider = searchProvider
+        SettingsManager.searchResultLimit = searchResultLimit
+        SettingsManager.memoryWritePolicy = memoryWritePolicy
         SettingsManager.defaultModelId = defaultModelId
         SettingsManager.globalSystemPrompt = globalSystemPrompt.isEmpty ? nil : globalSystemPrompt
     }

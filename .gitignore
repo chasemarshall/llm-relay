@@ -8,3 +8,17 @@
 # Build artifacts
 DerivedData/
 build/
+
+# Firebase
+firebase-debug.log
+
+# CocoaPods
+Pods/
+
+# SPM
+.build/
+Package.resolved
+
+# Secrets / env
+*.env
+*.xcconfig

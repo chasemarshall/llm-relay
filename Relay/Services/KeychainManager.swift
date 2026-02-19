@@ -40,12 +40,25 @@ enum KeychainManager {
         if updateStatus == errSecSuccess {
             return true
         }
+        if updateStatus != errSecItemNotFound {
+            return false
+        }
 
         var addQuery = query
         addQuery[kSecValueData as String] = data
         addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
         let addStatus = SecItemAdd(addQuery as CFDictionary, nil)
-        return addStatus == errSecSuccess || addStatus == errSecDuplicateItem
+        if addStatus == errSecSuccess {
+            return true
+        }
+        if addStatus == errSecDuplicateItem {
+            let retryStatus = SecItemUpdate(
+                query as CFDictionary,
+                [kSecValueData as String: data] as CFDictionary
+            )
+            return retryStatus == errSecSuccess
+        }
+        return false
     }
 
     private static func deleteFromKeychain(account: String) {

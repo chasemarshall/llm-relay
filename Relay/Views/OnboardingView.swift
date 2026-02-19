@@ -7,6 +7,10 @@ struct OnboardingView: View {
     @State private var selectedProvider: Provider = .openRouter
     @State private var apiKey = ""
 
+    private var providerKeyURL: URL? {
+        URL(string: "https://\(selectedProvider.keyPlaceholder)")
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             TabView(selection: $currentPage) {
@@ -126,10 +130,15 @@ struct OnboardingView: View {
                     .padding(12)
                     .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
 
-                Link("Get your key at \(selectedProvider.keyPlaceholder)",
-                     destination: URL(string: "https://\(selectedProvider.keyPlaceholder)")!)
-                    .font(.footnote)
-                    .foregroundStyle(.blue)
+                if let providerKeyURL {
+                    Link("Get your key at \(selectedProvider.keyPlaceholder)", destination: providerKeyURL)
+                        .font(.footnote)
+                        .foregroundStyle(.blue)
+                } else {
+                    Text("Get your key at \(selectedProvider.keyPlaceholder)")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             Spacer()

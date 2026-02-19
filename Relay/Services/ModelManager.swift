@@ -12,6 +12,7 @@ final class ModelManager {
     var models: [OpenRouterModel] = []
     var isLoading = false
     var currentProvider: Provider = .openRouter
+    var lastFetchError: String?
 
     private static func cacheKey(for provider: Provider) -> String {
         "llmchat_cached_models_\(provider.rawValue)"
@@ -60,6 +61,7 @@ final class ModelManager {
 
     func loadModels(for provider: Provider) {
         currentProvider = provider
+        lastFetchError = nil
         // Try loading from cache first
         let key = Self.cacheKey(for: provider)
         if let data = UserDefaults.standard.data(forKey: key),
@@ -77,10 +79,14 @@ final class ModelManager {
         if target == .anthropic {
             models = Self.anthropicDefaults
             cache(models, for: target)
+            lastFetchError = nil
             return
         }
 
-        guard let apiKey = KeychainManager.apiKey(for: target) else { return }
+        guard let apiKey = KeychainManager.apiKey(for: target) else {
+            lastFetchError = nil
+            return
+        }
         isLoading = true
         defer { isLoading = false }
 
@@ -89,10 +95,21 @@ final class ModelManager {
             var request = URLRequest(url: url)
             request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
             if target == .openRouter {
-                request.setValue("https://llmchat.app", forHTTPHeaderField: "HTTP-Referer")
+                request.setValue("https://relay.app", forHTTPHeaderField: "HTTP-Referer")
             }
+            request.timeoutInterval = 15
 
-            let (data, _) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse else {
+                throw URLError(.badServerResponse)
+            }
+            guard (200...299).contains(http.statusCode) else {
+                throw NSError(
+                    domain: "ModelManager",
+                    code: http.statusCode,
+                    userInfo: [NSLocalizedDescriptionKey: "HTTP \(http.statusCode)"]
+                )
+            }
 
             struct ModelsResponse: Codable {
                 let data: [ModelEntry]
@@ -102,15 +119,18 @@ final class ModelManager {
                 }
             }
 
-            let response = try JSONDecoder().decode(ModelsResponse.self, from: data)
-            let fetched = response.data.map { OpenRouterModel(id: $0.id, name: $0.name ?? $0.id) }
+            let modelsResponse = try JSONDecoder().decode(ModelsResponse.self, from: data)
+            let fetched = modelsResponse.data.map { OpenRouterModel(id: $0.id, name: $0.name ?? $0.id) }
 
             if !fetched.isEmpty {
                 models = fetched
                 cache(fetched, for: target)
+                lastFetchError = nil
+            } else {
+                lastFetchError = "No models returned by \(target.displayName). Using saved list."
             }
         } catch {
-            // Keep using cached/default models
+            lastFetchError = "Couldn't refresh models for \(target.displayName): \(error.localizedDescription). Using saved list."
         }
     }
 

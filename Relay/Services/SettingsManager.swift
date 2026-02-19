@@ -33,6 +33,20 @@ enum SearchProvider: String, CaseIterable, Sendable {
     }
 }
 
+enum MemoryWritePolicy: String, CaseIterable, Sendable {
+    case off
+    case ask
+    case auto
+
+    var displayName: String {
+        switch self {
+        case .off: "Off"
+        case .ask: "Ask"
+        case .auto: "Auto"
+        }
+    }
+}
+
 enum SettingsManager {
     private static let legacyDefaultModelKey = "llmchat_default_model"
     private static let defaultModelKeyPrefix = "llmchat_default_model_"
@@ -40,6 +54,9 @@ enum SettingsManager {
     private static let searchProviderKey = "llmchat_search_provider"
     private static let aiProviderKey = "llmchat_ai_provider"
     private static let onboardingKey = "llmchat_has_completed_onboarding"
+    private static let legacySearchToolCallLimitKey = "llmchat_search_tool_call_limit"
+    private static let searchResultLimitKey = "llmchat_search_result_limit"
+    private static let memoryWritePolicyKey = "llmchat_memory_write_policy"
     private nonisolated(unsafe) static let defaults = UserDefaults.standard
     private static let migrationLock = NSLock()
     private nonisolated(unsafe) static var didMigrateDefaultModel = false
@@ -111,6 +128,36 @@ enum SettingsManager {
             return provider
         }
         set { defaults.set(newValue.rawValue, forKey: searchProviderKey) }
+    }
+
+    static var searchResultLimit: Int {
+        get {
+            let stored = defaults.integer(forKey: searchResultLimitKey)
+            if stored > 0 {
+                return max(1, min(stored, 20))
+            }
+
+            let legacy = defaults.integer(forKey: legacySearchToolCallLimitKey)
+            if legacy > 0 {
+                return max(1, min(legacy, 20))
+            }
+
+            return 5
+        }
+        set {
+            defaults.set(max(1, min(newValue, 20)), forKey: searchResultLimitKey)
+        }
+    }
+
+    static var memoryWritePolicy: MemoryWritePolicy {
+        get {
+            guard let raw = defaults.string(forKey: memoryWritePolicyKey),
+                  let policy = MemoryWritePolicy(rawValue: raw) else { return .ask }
+            return policy
+        }
+        set {
+            defaults.set(newValue.rawValue, forKey: memoryWritePolicyKey)
+        }
     }
 
     static var hasCompletedOnboarding: Bool {

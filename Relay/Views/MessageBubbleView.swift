@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // MARK: - Bloom Modifier
 
@@ -35,7 +36,6 @@ struct MessageBubbleView: View {
     var onEdit: (() -> Void)?
     var onDelete: (() -> Void)?
 
-    @Environment(\.openURL) private var openURL
     @State private var showThinking = false
     @State private var showSources = false
 
@@ -131,6 +131,13 @@ struct MessageBubbleView: View {
             if !isUser { Spacer(minLength: 60) }
         }
         .padding(.horizontal, 12)
+        .environment(\.openURL, OpenURLAction { url in
+            guard let safeURL = sanitizedExternalURL(url) else {
+                return .discarded
+            }
+            UIApplication.shared.open(safeURL)
+            return .handled
+        })
     }
 
     // MARK: - Thinking Section
@@ -196,9 +203,7 @@ struct MessageBubbleView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         ForEach(sources) { source in
                             Button {
-                                if let url = URL(string: source.url) {
-                                    openURL(url)
-                                }
+                                openSafeURL(from: source.url)
                             } label: {
                                 HStack(spacing: 8) {
                                     Image(systemName: "globe")
@@ -365,5 +370,19 @@ struct MessageBubbleView: View {
             cornerRadius: AppTheme.Radius.bubble,
             style: .continuous
         )
+    }
+
+    private func openSafeURL(from text: String) {
+        guard let url = URL(string: text) else { return }
+        guard let safeURL = sanitizedExternalURL(url) else { return }
+        UIApplication.shared.open(safeURL)
+    }
+
+    private func sanitizedExternalURL(_ url: URL) -> URL? {
+        guard let scheme = url.scheme?.lowercased(), scheme == "https" || scheme == "http" else {
+            return nil
+        }
+        guard url.host != nil else { return nil }
+        return url
     }
 }
